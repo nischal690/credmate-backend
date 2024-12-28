@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { 
-  RekognitionClient, 
+import {
+  RekognitionClient,
   SearchFacesByImageCommand,
   CreateCollectionCommand,
 } from '@aws-sdk/client-rekognition';
@@ -10,9 +10,9 @@ import { ImageUtils } from '../../common/utils/image.utils';
 
 export interface FaceMatchResult {
   matched: boolean;
-  confidence?: number;
+  similarity?: number;
   matchedUserId?: string;
-  fullName?: string;
+  // fullName?: string;
   metadata?: string;
 }
 
@@ -34,7 +34,7 @@ export class FaceRecognitionService {
     this.collectionId = rekognitionConfig.collectionId;
     this.faceMatchThreshold = rekognitionConfig.faceMatchThreshold;
     this.tableName = dynamoDBConfig.faceRecognitionTableName;
-    
+
     this.initializeCollection();
   }
 
@@ -63,11 +63,11 @@ export class FaceRecognitionService {
         CollectionId: this.collectionId,
         Image: { Bytes: processedImageBuffer },
         FaceMatchThreshold: this.faceMatchThreshold,
-        MaxFaces: 4
+        MaxFaces: 4,
       });
 
       const response = await this.rekognitionClient.send(searchFacesCommand);
-      
+
       if (!response.FaceMatches || response.FaceMatches.length === 0) {
         return [{ matched: false }];
       }
@@ -75,28 +75,29 @@ export class FaceRecognitionService {
       return await Promise.all(
         response.FaceMatches.slice(0, 4).map(async (match) => {
           const rekognitionId = match.Face?.FaceId;
-          let fullName = null;
-          
+          let userId = null;
+
           if (rekognitionId) {
             const getItemCommand = new GetItemCommand({
               TableName: this.tableName,
               Key: {
-                RekognitionId: { S: rekognitionId }
-              }
+                RekognitionId: { S: rekognitionId },
+              },
             });
-            
-            const dynamoResponse = await this.dynamoDBClient.send(getItemCommand);
+
+            const dynamoResponse =
+              await this.dynamoDBClient.send(getItemCommand);
             if (dynamoResponse.Item) {
-              fullName = dynamoResponse.Item.FullName?.S;
+              userId = dynamoResponse.Item.UserId?.S;
             }
           }
 
           return {
             matched: true,
-            Similarity: match.Similarity,
-            FullName: fullName
+            similarity: match.Similarity,
+            matchedUserId: userId,
           };
-        })
+        }),
       );
     } catch (error) {
       console.error('Error in face search:', error);
@@ -104,17 +105,19 @@ export class FaceRecognitionService {
     }
   }
 
-  private async getUserDetails(rekognitionId: string): Promise<{ matchedUserId?: string; fullName?: string; metadata?: string }> {
+  private async getUserDetails(
+    rekognitionId: string,
+  ): Promise<{ matchedUserId?: string; fullName?: string; metadata?: string }> {
     try {
       const getItemCommand = new GetItemCommand({
         TableName: this.tableName,
         Key: {
-          RekognitionId: { S: rekognitionId }
-        }
+          RekognitionId: { S: rekognitionId },
+        },
       });
-      
+
       const response = await this.dynamoDBClient.send(getItemCommand);
-      
+
       if (!response.Item) {
         return {};
       }
@@ -122,7 +125,7 @@ export class FaceRecognitionService {
       return {
         matchedUserId: response.Item.userId?.S,
         fullName: response.Item.FullName?.S,
-        metadata: response.Item.metadata?.S
+        metadata: response.Item.metadata?.S,
       };
     } catch (error) {
       console.error('Error fetching user details:', error);
