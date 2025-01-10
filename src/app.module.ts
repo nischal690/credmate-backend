@@ -6,7 +6,9 @@ import { UserModule } from './user/user.module';
 import { SearchModule } from './search/search.module';
 import { HealthModule } from './common/health/health.module';
 import { BorrowerModule } from './borrower/borrower.module';
+import { PaymentModule } from './payment/payment.module';
 import { AppController } from './app.controller';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
@@ -20,11 +22,13 @@ import { AppController } from './app.controller';
         limit: 10,
       },
     ]),
+    PrismaModule,
     AuthModule,
     UserModule,
     SearchModule,
     HealthModule,
     BorrowerModule,
+    PaymentModule,
   ],
   controllers: [AppController],
 })
