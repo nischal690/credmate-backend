@@ -141,7 +141,45 @@ export class SearchService {
     }
 
     const user = await this.prisma.user.findUnique({
-      where: { panNumber } as unknown as Prisma.UserWhereUniqueInput,
+      where: { panNumber },
+      select: {
+        id: true,
+        name: true,
+        date_of_birth: true,
+        businessType: true,
+        profileImageUrl: true,
+        phoneNumber: true,
+        aadhaarNumber: true,
+        panNumber: true,
+        createdAt: true,
+        updatedAt: true
+      },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return user;
+  }
+
+  async searchByReferralCode(
+    referralCode: string,
+  ): Promise<UserProfileResponse | null> {
+    if (!referralCode) {
+      throw new BadRequestException('Referral code is required');
+    }
+
+    // Convert to uppercase to make it case-insensitive
+    const upperReferralCode = referralCode.toUpperCase();
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        referralCode: {
+          equals: upperReferralCode,
+          mode: 'insensitive'  // Make the search case-insensitive
+        }
+      },
       select: {
         id: true,
         name: true,

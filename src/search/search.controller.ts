@@ -95,6 +95,20 @@ export class SearchController {
     return user;
   }
 
+  @Get('referral/:referralCode')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Search user by referral code' })
+  @ApiResponse({ status: 200, description: 'User found', type: UserProfileResponseDto })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async searchByReferralCode(@Param('referralCode') referralCode: string) {
+    const user = await this.searchService.searchByReferralCode(referralCode);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user;
+  }
+
   // Future search endpoints can be added here
   // @Post('text')
   // async searchByText(@Body() dto: SearchTextDto) { ... }
