@@ -14,7 +14,7 @@ export function generateTestToken(jwtSecret: string = 'your-test-secret-key'): s
   const dummyPayload: CustomJwtPayload = {
     uid: 'test-user-123',
     email: 'test@example.com',
-    phoneNumber: '+1234567890',
+    phoneNumber: '1234567890',
     emailVerified: true,
     name: 'Test User',
     picture: 'https://example.com/test-user.jpg'
