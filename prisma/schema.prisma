@@ -30,7 +30,8 @@ model User {
   panNumber       String?   @unique
   profileImageUrl String?
   plan            UserPlan  @default(FREE)
-  referralCode    String    @unique @default(uuid()) // Automatically generated referral code
+  referralCode    String    @unique @default(dbgenerated("substring(upper(replace(cast(gen_random_uuid() as varchar), '-', '')), 1, 6)")) // 6-char alphanumeric code
+  joinedReferralCode  String?   // Referral code used when joining
   planPrice       Float?    // New field for storing plan price
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
