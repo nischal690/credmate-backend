@@ -66,6 +66,16 @@ export class UpdateUserProfileDto {
   businessType?: string;
 
   @ApiProperty({
+    description: 'Referral code used when joining',
+    example: 'ABC123',
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: 'Joined referral code must be a string when provided' })
+  @Transform(({ value }) => (value === undefined || value === null ? undefined : value.toString()))
+  joinedReferralCode?: string;
+
+  @ApiProperty({
     type: 'string',
     format: 'binary',
     required: false,
@@ -94,7 +104,7 @@ export class UserController {
     return this.userService.getCompleteUserProfile(req.user);
   }
 
-  @Post('updateprofile')
+  @Put('updateprofile')
   @ApiBearerAuth('Firebase-auth')
   @ApiOperation({
     summary: 'Update user profile with optional image upload',
@@ -108,16 +118,9 @@ export class UserController {
     @Body() updateUserProfileDto: UpdateUserProfileDto,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<UserProfileResponse> {
-    // Make all fields optional and handle empty values
-    const cleanedData = {
-      ...(updateUserProfileDto.name && { name: updateUserProfileDto.name }),
-      ...(updateUserProfileDto.date_of_birth && { date_of_birth: updateUserProfileDto.date_of_birth }),
-      ...(updateUserProfileDto.businessType && { businessType: updateUserProfileDto.businessType }),
-    };
-
     return this.userService.updateUserProfile(
       req.user,
-      cleanedData,
+      updateUserProfileDto,
       file,
     );
   }

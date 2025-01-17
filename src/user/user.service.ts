@@ -20,6 +20,10 @@ export class UpdateUserProfileDto {
   @IsString()
   @IsOptional()
   businessType?: string;
+
+  @IsString()
+  @IsOptional()
+  joinedReferralCode?: string;
 }
 
 @Injectable()
@@ -48,6 +52,17 @@ export class UserService extends BaseService {
       throw new UnauthorizedException('User not found');
     }
 
+    // Validate referral code if provided
+    if (updateData.joinedReferralCode) {
+      const referralUser = await this.prismaService.user.findUnique({
+        where: { referralCode: updateData.joinedReferralCode },
+      });
+
+      if (!referralUser) {
+        throw new BadRequestException('Invalid referral code');
+      }
+    }
+
     let profileImageUrl: string | undefined;
 
     // If a file was uploaded, process it
@@ -73,6 +88,7 @@ export class UserService extends BaseService {
       ...(updateData.name && { name: updateData.name }),
       ...(updateData.date_of_birth && { date_of_birth: updateData.date_of_birth }),
       ...(updateData.businessType && { businessType: updateData.businessType }),
+      ...(updateData.joinedReferralCode && { joinedReferralCode: updateData.joinedReferralCode }),
       ...(profileImageUrl && { profileImageUrl }),
     };
 
@@ -96,6 +112,7 @@ export class UserService extends BaseService {
         panNumber: true,
         plan: true,
         referralCode: true,
+        joinedReferralCode: true,
         planPrice: true,
         metadata: true,
         status: true,
