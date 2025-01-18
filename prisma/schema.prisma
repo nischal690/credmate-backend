@@ -161,9 +161,9 @@ enum CreditOfferStatus {
 
 model CreditOffer {
   id                String            @id @default(uuid())
-  parentOfferId    String?           // For tracking negotiation history
-  offerByUserId    String            // User who created the offer
-  offerToUserId    String            // User to whom offer is made
+  parentOfferId     String?           // For tracking negotiation history
+  offerByUserId     String            // User who created the offer
+  offerToUserId     String            // User to whom offer is made
   loanAmount       Float
   loanTerm         Int
   timeUnit         String            // DAYS, MONTHS, YEARS
@@ -272,4 +272,25 @@ model Payment {
 
   @@index([uid])
   @@map("payments")
+}
+
+// ======= All Lender Request Service =======
+model AllLenderRequest {
+  id            String    @id @default(uuid())
+  uid           String    // User ID of the requester
+  loanAmount    Float
+  loanTerms     Int
+  timeUnit      String    // DAYS, MONTHS, YEARS
+  interestRate  Float
+  purpose       String    // Purpose of the loan
+  paymentType   String    // ONE_TIME, EMI
+  emiFrequency  String?   // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY (null if ONE_TIME payment)
+  emiAmount     Float?    // null if ONE_TIME payment
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  metadata      Json?     // For any additional data
+
+  @@index([uid])
+  @@map("alllenderrequests")
 }
