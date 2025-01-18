@@ -9,6 +9,8 @@ import { BorrowerModule } from './borrower/borrower.module';
 import { PaymentModule } from './payment/payment.module';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
+import { LenderRequestModule } from './lender/lender-request.module';
+import { CreditModule } from './credit/credit.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { PrismaModule } from './prisma/prisma.module';
     HealthModule,
     BorrowerModule,
     PaymentModule,
+    LenderRequestModule,
+    CreditModule,
   ],
   controllers: [AppController],
 })

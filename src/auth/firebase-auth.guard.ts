@@ -30,12 +30,24 @@ export class FirebaseAuthGuard implements CanActivate {
     try {
       const decodedToken = await this.firebaseService.verifyIdToken(token);
 
+      // Format phone number - ensure it has + prefix and no spaces
+      let formattedPhoneNumber = decodedToken.phone_number;
+      if (formattedPhoneNumber) {
+        // Remove any spaces
+        formattedPhoneNumber = formattedPhoneNumber.replace(/\s/g, '');
+        // Ensure it has + prefix
+        if (!formattedPhoneNumber.startsWith('+')) {
+          formattedPhoneNumber = '+' + formattedPhoneNumber;
+        }
+        this.logger.debug('Formatted phone number:', formattedPhoneNumber);
+      }
+
       // Add user data to request
       request.user = {
         uid: decodedToken.uid,
         email: decodedToken.email,
         emailVerified: decodedToken.email_verified,
-        phoneNumber: decodedToken.phone_number,
+        phoneNumber: formattedPhoneNumber,
         name: decodedToken.name,
         picture: decodedToken.picture,
       };
