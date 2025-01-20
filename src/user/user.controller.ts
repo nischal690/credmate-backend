@@ -10,18 +10,17 @@ import {
   UploadedFile,
   UseInterceptors,
   Put,
+  Logger,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { IsString, IsOptional, IsDateString } from 'class-validator';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBody,
   ApiBearerAuth,
-  ApiProperty,
   ApiConsumes,
 } from '@nestjs/swagger';
 import { UserProfileResponseDto } from './dto/user-profile-response.dto';
@@ -29,61 +28,10 @@ import { UserProfileResponse } from './interfaces/user-profile.interface';
 import { NotFoundException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Express } from 'express';
-import { Transform } from 'class-transformer';
 import { SaveProfileDto } from './dto/save-profile.dto';
 import { UpdateSavedProfileDto } from './dto/update-saved-profile.dto';
 import { SaveProfileResponseDto } from './dto/save-profile-response.dto';
-
-export class UpdateUserProfileDto {
-  @ApiProperty({
-    description: 'Full name of the user',
-    example: 'John Doe',
-    required: false,
-  })
-  @IsOptional()
-  @IsString({ message: 'Name must be a string when provided' })
-  @Transform(({ value }) => (value === undefined || value === null ? undefined : value.toString()))
-  name?: string;
-
-  @ApiProperty({
-    description: 'Date of birth in ISO format',
-    example: '1990-01-01',
-    required: false,
-  })
-  @IsOptional()
-  @IsDateString({}, { message: 'Date of birth must be a valid ISO date string when provided' })
-  @Transform(({ value }) => (value === undefined || value === null ? undefined : value.toString()))
-  date_of_birth?: string;
-
-  @ApiProperty({
-    description: 'Type of business',
-    example: 'Retail',
-    required: false,
-  })
-  @IsOptional()
-  @IsString({ message: 'Business type must be a string when provided' })
-  @Transform(({ value }) => (value === undefined || value === null ? undefined : value.toString()))
-  businessType?: string;
-
-  @ApiProperty({
-    description: 'Referral code used when joining',
-    example: 'ABC123',
-    required: false,
-  })
-  @IsOptional()
-  @IsString({ message: 'Joined referral code must be a string when provided' })
-  @Transform(({ value }) => (value === undefined || value === null ? undefined : value.toString()))
-  joinedReferralCode?: string;
-
-  @ApiProperty({
-    type: 'string',
-    format: 'binary',
-    required: false,
-    description: 'Profile image file',
-  })
-  @IsOptional()
-  profileImage?: Express.Multer.File;
-}
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 
 @ApiTags('users')
 @Controller('user')
@@ -109,20 +57,38 @@ export class UserController {
   @ApiOperation({
     summary: 'Update user profile with optional image upload',
     description:
-      'Updates user profile information including name, date of birth, and business type',
+      'Updates user profile information including name, date of birth, business type, and KYC details',
   })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes('multipart/form-data', 'application/json')
   @UseInterceptors(FileInterceptor('profileImage'))
   async updateProfile(
     @Request() req,
     @Body() updateUserProfileDto: UpdateUserProfileDto,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<UserProfileResponse> {
-    return this.userService.updateUserProfile(
-      req.user,
-      updateUserProfileDto,
-      file,
-    );
+    const logger = new Logger('UpdateProfile');
+    
+    // Log request details
+    logger.log('Content-Type:', req.headers['content-type']);
+    logger.log('Request body:', updateUserProfileDto);
+    logger.log('File:', file ? {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    } : 'No file uploaded');
+
+    try {
+      const result = await this.userService.updateUserProfile(
+        req.user,
+        updateUserProfileDto,
+        file,
+      );
+      logger.log('Update successful:', result);
+      return result;
+    } catch (error) {
+      logger.error('Update failed:', error);
+      throw error;
+    }
   }
 
   @UseGuards(JwtAuthGuard)

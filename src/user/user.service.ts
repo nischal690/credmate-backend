@@ -39,7 +39,7 @@ export class UserService extends BaseService {
 
   async updateUserProfile(
     user: any,
-    updateData: Partial<UpdateUserProfileDto>,
+    updateData: any,
     file?: Express.Multer.File,
   ): Promise<UserProfileResponse> {
     // Get user from database
@@ -83,13 +83,16 @@ export class UserService extends BaseService {
       }
     }
 
-    // Only include fields that were actually provided
+    // Clean up the update data
     const dataToUpdate = {
       ...(updateData.name && { name: updateData.name }),
       ...(updateData.date_of_birth && { date_of_birth: updateData.date_of_birth }),
       ...(updateData.businessType && { businessType: updateData.businessType }),
       ...(updateData.joinedReferralCode && { joinedReferralCode: updateData.joinedReferralCode }),
       ...(profileImageUrl && { profileImageUrl }),
+      ...(updateData.aadharcard && { aadharcard: updateData.aadharcard }),
+      ...(updateData.kyc !== undefined && { kyc: updateData.kyc === 'true' || updateData.kyc === true }),
+      ...(updateData.aadhaarNumber && { aadhaarNumber: updateData.aadhaarNumber }),
     };
 
     // Update user profile in database only if we have data to update
@@ -97,31 +100,39 @@ export class UserService extends BaseService {
       throw new BadRequestException('No data provided for update');
     }
 
-    const updatedUser = await this.prismaService.user.update({
-      where: { id: dbUser.id },
-      data: dataToUpdate,
-      select: {
-        id: true,
-        name: true,
-        date_of_birth: true,
-        businessType: true,
-        profileImageUrl: true,
-        phoneNumber: true,
-        email: true,
-        aadhaarNumber: true,
-        panNumber: true,
-        plan: true,
-        referralCode: true,
-        joinedReferralCode: true,
-        planPrice: true,
-        metadata: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true
-      },
-    });
-
-    return updatedUser;
+    try {
+      const updatedUser = await this.prismaService.user.update({
+        where: { id: dbUser.id },
+        data: dataToUpdate,
+        select: {
+          id: true,
+          name: true,
+          date_of_birth: true,
+          businessType: true,
+          profileImageUrl: true,
+          phoneNumber: true,
+          email: true,
+          aadhaarNumber: true,
+          aadharcard: true,
+          kyc: true,
+          panNumber: true,
+          plan: true,
+          referralCode: true,
+          joinedReferralCode: true,
+          planPrice: true,
+          metadata: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true
+        },
+      });
+      return updatedUser;
+    } catch (error) {
+      if (error.code === 'P2002') {
+        throw new BadRequestException('This Aadhar number is already registered');
+      }
+      throw error;
+    }
   }
 
   async getUserFiles(user: any): Promise<string[]> {

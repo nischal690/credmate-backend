@@ -27,6 +27,7 @@ model User {
   date_of_birth   DateTime?
   phoneNumber     String    @unique
   aadhaarNumber   String?   @unique
+  aadharcard      String?   // URL or path to stored Aadhar card image/document
   panNumber       String?   @unique
   profileImageUrl String?
   plan            UserPlan  @default(FREE)
@@ -39,6 +40,7 @@ model User {
   status          String    @default("ACTIVE") // ACTIVE, SUSPENDED, DELETED
   credmateScore   Int       @default(0)  // New field for Credmate score
   creditScore     Int       @default(0)  // New field for credit score
+  kyc            Boolean    @default(false)  // KYC verification status
 
   @@map("users")
 }
