@@ -23,6 +23,7 @@ export class PaymentService {
       data: {
         uid: user.id,
         amount: createPaymentDto.amount,
+        paymentFor: createPaymentDto.paymentFor,
         requestRaised: true,
         paid: false,
         createdTime: format(new Date(), 'HH:mm:ss'),
