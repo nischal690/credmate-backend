@@ -12,6 +12,19 @@ interface FirebaseUser {
   picture?: string;
 }
 
+interface GetCreditOffersDto {
+  offerByUserId?: string;
+  offerToUserId?: string;
+  status?: string;
+  paymentType?: string;
+  emiFrequency?: string;
+  minLoanAmount?: number;
+  maxLoanAmount?: number;
+  minInterestRate?: number;
+  maxInterestRate?: number;
+  filterByMe?: boolean;
+}
+
 @Injectable()
 export class CreditService {
   private readonly logger = new Logger(CreditService.name);
@@ -83,5 +96,67 @@ export class CreditService {
     });
 
     return updatedOffer;
+  }
+
+  async getCreditOffers(filters: GetCreditOffersDto, user: DecodedIdToken) {
+    const where: any = {
+      isLatest: true,
+    };
+
+    // Handle filterByMe option
+    if (filters.filterByMe) {
+      where.OR = [
+        { offerByUserId: user.uid },
+        { offerToUserId: user.uid }
+      ];
+    } else {
+      // Apply regular user filters only if not filtering by logged-in user
+      if (filters.offerByUserId) {
+        where.offerByUserId = filters.offerByUserId;
+      }
+
+      if (filters.offerToUserId) {
+        where.offerToUserId = filters.offerToUserId;
+      }
+    }
+
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    if (filters.paymentType) {
+      where.paymentType = filters.paymentType;
+    }
+
+    if (filters.emiFrequency) {
+      where.emiFrequency = filters.emiFrequency;
+    }
+
+    if (filters.minLoanAmount || filters.maxLoanAmount) {
+      where.loanAmount = {};
+      if (filters.minLoanAmount) {
+        where.loanAmount.gte = filters.minLoanAmount;
+      }
+      if (filters.maxLoanAmount) {
+        where.loanAmount.lte = filters.maxLoanAmount;
+      }
+    }
+
+    if (filters.minInterestRate || filters.maxInterestRate) {
+      where.interestRate = {};
+      if (filters.minInterestRate) {
+        where.interestRate.gte = filters.minInterestRate;
+      }
+      if (filters.maxInterestRate) {
+        where.interestRate.lte = filters.maxInterestRate;
+      }
+    }
+
+    return this.prisma.creditOffer.findMany({
+      where,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
   }
 }

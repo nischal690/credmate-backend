@@ -1,7 +1,8 @@
-import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Query } from '@nestjs/common';
 import { CreditService } from './credit.service';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { GiveCreditDto } from './dto/give-credit.dto';
+import { GetCreditOffersDto } from './dto/get-credit-offers.dto';
 import { Request } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
 
@@ -10,13 +11,19 @@ interface RequestWithUser extends Request {
   user: DecodedIdToken;
 }
 
-@Controller('credit')
+@Controller('credit/offers')
 export class CreditController {
   constructor(private readonly creditService: CreditService) {}
 
-  @Post('give-credit')
+  @Post()
   @UseGuards(FirebaseAuthGuard)
   async giveCredit(@Body() giveCreditDto: GiveCreditDto, @Req() request: RequestWithUser) {
     return this.creditService.createCreditOffer(giveCreditDto, request.user);
+  }
+
+  @Get()
+  @UseGuards(FirebaseAuthGuard)
+  async getCreditOffers(@Query() filters: GetCreditOffersDto, @Req() request: RequestWithUser) {
+    return this.creditService.getCreditOffers(filters, request.user);
   }
 }
