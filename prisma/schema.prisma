@@ -263,16 +263,16 @@ model Transaction {
 
 // ======= Payment Service =======
 model Payment {
-  id              String    @id @default(uuid())
-  uid             String    // User ID who made the payment
-  amount          Float
-  requestRaised   Boolean   @default(false)
-  paid            Boolean   @default(false)
-  createdDate     DateTime  @default(now())
-  createdTime     String    // Store time as string for better formatting
-  metadata        Json?     // For additional payment data
+  id            String    @id @default(uuid())
+  uid           String    // User ID
+  amount        Float
+  paymentFor    String    // Purpose of the payment
+  requestRaised Boolean   @default(false)
+  paid          Boolean   @default(false)
+  createdTime   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  @@index([uid])
   @@map("payments")
 }
 
