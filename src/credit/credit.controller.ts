@@ -3,6 +3,7 @@ import { CreditService } from './credit.service';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { GiveCreditDto } from './dto/give-credit.dto';
 import { GetCreditOffersDto } from './dto/get-credit-offers.dto';
+import { RequestCreditDto } from './dto/request-credit.dto';
 import { Request } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
 
@@ -25,5 +26,11 @@ export class CreditController {
   @UseGuards(FirebaseAuthGuard)
   async getCreditOffers(@Query() filters: GetCreditOffersDto, @Req() request: RequestWithUser) {
     return this.creditService.getCreditOffers(filters, request.user);
+  }
+
+  @Post('request')
+  @UseGuards(FirebaseAuthGuard)
+  async requestCredit(@Body() requestCreditDto: RequestCreditDto, @Req() request: RequestWithUser) {
+    return this.creditService.createCreditRequest(requestCreditDto, request.user);
   }
 }
