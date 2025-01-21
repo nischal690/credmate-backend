@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsNotEmpty } from 'class-validator';
+import { IsString, IsNumber, IsNotEmpty, IsEnum, ValidateIf, IsIn } from 'class-validator';
 
 export class GiveCreditDto {
   @IsString()
@@ -15,6 +15,7 @@ export class GiveCreditDto {
 
   @IsString()
   @IsNotEmpty()
+  @IsIn(['DAYS', 'MONTHS', 'YEARS'])
   timeUnit: string;
 
   @IsNumber()
@@ -23,9 +24,12 @@ export class GiveCreditDto {
 
   @IsString()
   @IsNotEmpty()
+  @IsIn(['EMI', 'BULLET'])
   paymentType: string;
 
+  @ValidateIf(o => o.paymentType === 'EMI')
   @IsString()
   @IsNotEmpty()
+  @IsIn(['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'])
   emiFrequency: string;
 }
