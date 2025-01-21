@@ -2,7 +2,7 @@
     push:
         branches:
             - main
-name: Deploy to cred
+name: Deploy to credm
 jobs:
     porter-deploy:
         runs-on: ubuntu-latest
@@ -18,7 +18,7 @@ jobs:
               timeout-minutes: 30
               run: exec porter apply
               env:
-                PORTER_APP_NAME: cred
+                PORTER_APP_NAME: credm
                 PORTER_CLUSTER: "4497"
                 PORTER_DEPLOYMENT_TARGET_ID: c358d466-ca73-4c0c-83ff-bb27c8471cf6
                 PORTER_HOST: https://dashboard.porter.run
