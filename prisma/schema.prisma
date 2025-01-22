@@ -171,7 +171,7 @@ model CreditOffer {
   timeUnit         String            // DAYS, MONTHS, YEARS
   interestRate     Float
   paymentType      String            // EMI, BULLET
-  emiFrequency     String            // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
+  emiFrequency     String?            // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
   status           CreditOfferStatus @default(PROPOSED)
   versionNumber    Int               @default(1)
   isLatest        Boolean           @default(true)
