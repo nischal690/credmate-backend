@@ -13,6 +13,7 @@ export interface UserProfileResponse {
   planPrice?: number;
   metadata?: any;
   status?: string;
+  kyc?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
