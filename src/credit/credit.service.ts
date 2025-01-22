@@ -207,15 +207,14 @@ export class CreditService {
     // Create a new credit request in the database
     const creditRequest = await this.prisma.creditRequest.create({
       data: {
-        amount,
-        lendingTerm,
+        loanAmount: amount,
+        loanTerm: lendingTerm,
         timeUnit,
         interestRate,
         paymentType,
         emiFrequency,
-        status: CreditRequestStatus.PENDING,
-        borrowerId: user.uid,
-        requestByUserId: user.uid
+        requestByUserId: user.uid,
+        requestedToUserId: createCreditRequestDto.requestedToUserId
       },
     });
 

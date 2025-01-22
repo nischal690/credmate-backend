@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsNotEmpty } from 'class-validator';
 
 export enum PaymentType {
   EMI = 'emi',
@@ -45,4 +45,8 @@ export class CreateCreditRequestDto {
 
   @IsEnum(EMIFrequency)
   emiFrequency: EMIFrequency;
+
+  @IsString()
+  @IsNotEmpty()
+  requestedToUserId: string;
 }
