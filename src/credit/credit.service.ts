@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DecodedIdToken } from 'firebase-admin/auth';
+import { CreateCreditRequestDto, CreditRequestStatus } from './dto/create-credit-request.dto';
 
 // Custom type for our Firebase user from the auth guard
 interface FirebaseUser {
@@ -23,6 +24,14 @@ interface GetCreditOffersDto {
   minInterestRate?: number;
   maxInterestRate?: number;
   filterByMe?: boolean;
+}
+
+interface RequestCreditDto {
+  offerId: string;
+  loanAmount: number;
+  loanTerm?: number;
+  timeUnit?: string;
+  note?: string;
 }
 
 @Injectable()
@@ -82,7 +91,7 @@ export class CreditService {
         timeUnit: giveCreditDto.timeUnit,
         interestRate: giveCreditDto.interestRate,
         paymentType: giveCreditDto.paymentType,
-        emiFrequency: giveCreditDto.emiFrequency,
+        emiFrequency: giveCreditDto.paymentType === 'BULLET' ? 'NONE' : giveCreditDto.emiFrequency,
         status: 'PROPOSED',
         versionNumber: 1,
         expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
@@ -158,5 +167,58 @@ export class CreditService {
         createdAt: 'desc',
       },
     });
+  }
+
+  async createCreditRequest(requestCreditDto: RequestCreditDto, user: DecodedIdToken) {
+    const { offerId, loanAmount, loanTerm, timeUnit, note } = requestCreditDto;
+
+    // Find the credit offer
+    const creditOffer = await this.prisma.creditOffer.findUnique({
+      where: { id: offerId }
+    });
+
+    if (!creditOffer) {
+      throw new NotFoundException('Credit offer not found');
+    }
+
+    // Create the credit request
+    return this.prisma.creditRequest.create({
+      data: {
+        loanAmount,
+        loanTerm: loanTerm || creditOffer.loanTerm,
+        timeUnit: timeUnit || creditOffer.timeUnit,
+        interestRate: creditOffer.interestRate,
+        paymentType: creditOffer.paymentType,
+        emiFrequency: creditOffer.emiFrequency,
+        status: 'PROPOSED',
+        requestByUserId: user.uid,
+        requestedToUserId: creditOffer.offerByUserId,
+        metadata: note ? { note } : undefined
+      }
+    });
+  }
+
+  async raiseCreditRequest(
+    createCreditRequestDto: CreateCreditRequestDto,
+    user: DecodedIdToken
+  ) {
+    const { amount, lendingTerm, timeUnit, interestRate, paymentType, emiFrequency } = createCreditRequestDto;
+
+    // Create a new credit request in the database
+    const creditRequest = await this.prisma.creditRequest.create({
+      data: {
+        amount,
+        lendingTerm,
+        timeUnit,
+        interestRate,
+        paymentType,
+        emiFrequency,
+        status: CreditRequestStatus.PENDING,
+        borrowerId: user.uid,
+        requestByUserId: user.uid
+      },
+    });
+
+    return creditRequest;
   }
 }
