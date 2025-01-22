@@ -209,6 +209,7 @@ export class UserService extends BaseService {
       });
     }
 
+    console.log('User Profile Response:', JSON.stringify(userProfile, null, 2));
     return userProfile;
   }
 
