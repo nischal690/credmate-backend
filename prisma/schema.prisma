@@ -262,11 +262,17 @@ model Transaction {
 }
 
 // ======= Payment Service =======
+enum PaymentFor {
+  SUBSCRIPTION
+  CREDIT
+  OTHER
+}
+
 model Payment {
-  id            String    @id @default(uuid())
+  id            String     @id @default(uuid())
   uid           String    // User ID
   amount        Float
-  paymentFor    String    // Purpose of the payment
+  paymentFor    PaymentFor
   requestRaised Boolean   @default(false)
   paid          Boolean   @default(false)
   createdTime   String?

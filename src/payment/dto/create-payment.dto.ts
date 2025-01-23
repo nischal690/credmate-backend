@@ -1,5 +1,11 @@
-import { IsNumber, Min, IsString, IsNotEmpty } from 'class-validator';
+import { IsNumber, Min, IsEnum, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+export enum PaymentFor {
+  SUBSCRIPTION = 'SUBSCRIPTION',
+  CREDIT = 'CREDIT',
+  OTHER = 'OTHER'
+}
 
 export class CreatePaymentDto {
   @ApiProperty({ description: 'Amount to be paid' })
@@ -7,8 +13,12 @@ export class CreatePaymentDto {
   @Min(0)
   amount: number;
 
-  @ApiProperty({ description: 'Purpose or reason for the payment' })
-  @IsString()
+  @ApiProperty({ 
+    description: 'Purpose of the payment',
+    enum: PaymentFor,
+    example: PaymentFor.SUBSCRIPTION
+  })
+  @IsEnum(PaymentFor)
   @IsNotEmpty()
-  paymentFor: string;
+  paymentFor: PaymentFor;
 }

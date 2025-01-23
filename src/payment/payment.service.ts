@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
+import { CreatePaymentDto, PaymentFor } from './dto/create-payment.dto';
 import { format } from 'date-fns';
 
 @Injectable()
@@ -23,7 +23,7 @@ export class PaymentService {
       data: {
         uid: user.id,
         amount: createPaymentDto.amount,
-        paymentFor: createPaymentDto.paymentFor,
+        paymentFor: createPaymentDto.paymentFor.toUpperCase() as PaymentFor,
         requestRaised: true,
         paid: false,
         createdTime: format(new Date(), 'HH:mm:ss'),
