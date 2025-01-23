@@ -1,52 +1,62 @@
-import { IsString, IsNumber, IsEnum, IsNotEmpty } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
 
 export enum PaymentType {
-  EMI = 'emi',
-  BULLET = 'bullet'
+  EMI = 'EMI',
+  BULLET = 'BULLET'
 }
 
 export enum EMIFrequency {
-  DAILY = 'daily',
-  WEEKLY = 'weekly',
-  MONTHLY = 'monthly',
-  QUARTERLY = 'quarterly',
-  YEARLY = 'yearly'
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  MONTHLY = 'MONTHLY',
+  QUARTERLY = 'QUARTERLY',
+  YEARLY = 'YEARLY'
 }
 
 export enum TimeUnit {
-  DAYS = 'days',
-  WEEKS = 'weeks',
-  MONTHS = 'months',
-  YEARS = 'years'
+  DAYS = 'DAYS',
+  MONTHS = 'MONTHS',
+  YEARS = 'YEARS'
 }
 
 export enum CreditRequestStatus {
-  PENDING = 'PENDING',
-  APPROVED = 'APPROVED',
+  PROPOSED = 'PROPOSED',
+  ACCEPTED = 'ACCEPTED',
   REJECTED = 'REJECTED',
-  CANCELLED = 'CANCELLED'
+  EXPIRED = 'EXPIRED',
+  NEGOTIATED = 'NEGOTIATED'
 }
 
 export class CreateCreditRequestDto {
+  @IsString()
+  @IsNotEmpty()
+  lenderMobileNo: string;
+
   @IsNumber()
+  @IsNotEmpty()
   amount: number;
 
   @IsNumber()
+  @IsNotEmpty()
   lendingTerm: number;
 
   @IsEnum(TimeUnit)
+  @IsNotEmpty()
   timeUnit: TimeUnit;
 
   @IsNumber()
+  @IsNotEmpty()
   interestRate: number;
-
-  @IsEnum(PaymentType)
-  paymentType: PaymentType;
-
-  @IsEnum(EMIFrequency)
-  emiFrequency: EMIFrequency;
 
   @IsString()
   @IsNotEmpty()
-  requestedToUserId: string;
+  purposeOfLoan: string;
+
+  @IsEnum(PaymentType)
+  @IsNotEmpty()
+  paymentType: PaymentType;
+
+  @IsEnum(EMIFrequency)
+  @IsOptional()
+  emiFrequency?: EMIFrequency;
 }

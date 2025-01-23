@@ -140,7 +140,7 @@ model CreditRequest {
   timeUnit          String             // DAYS, MONTHS, YEARS
   interestRate      Float
   paymentType       String             // EMI, BULLET
-  emiFrequency      String             // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
+  emiFrequency      String             // NONE, DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
   status            CreditRequestStatus @default(PROPOSED)
   versionNumber     Int                @default(1)
   isLatest         Boolean            @default(true)
@@ -171,7 +171,7 @@ model CreditOffer {
   timeUnit         String            // DAYS, MONTHS, YEARS
   interestRate     Float
   paymentType      String            // EMI, BULLET
-  emiFrequency     String?            // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
+  emiFrequency     String?            // NONE, DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
   status           CreditOfferStatus @default(PROPOSED)
   versionNumber    Int               @default(1)
   isLatest        Boolean           @default(true)
@@ -211,7 +211,7 @@ model Credit {
   timeUnit          String        // DAYS, MONTHS, YEARS
   interestRate      Float
   paymentType       String        // EMI, BULLET
-  emiFrequency      String        // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
+  emiFrequency      String        // NONE, DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
   status            CreditStatus  @default(ACTIVE)
   offeredId         String?       // ID of the offer that was accepted
   recoveryMode      Boolean       @default(false)
@@ -292,7 +292,7 @@ model AllLenderRequest {
   interestRate  Float
   purpose       String    // Purpose of the loan
   paymentType   String    // ONE_TIME, EMI
-  emiFrequency  String?   // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY (null if ONE_TIME payment)
+  emiFrequency  String?   // NONE, DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY (null if ONE_TIME payment)
   emiAmount     Float?    // null if ONE_TIME payment
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

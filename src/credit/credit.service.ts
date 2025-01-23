@@ -189,7 +189,7 @@ export class CreditService {
         timeUnit: timeUnit || creditOffer.timeUnit,
         interestRate: creditOffer.interestRate,
         paymentType: creditOffer.paymentType,
-        emiFrequency: creditOffer.emiFrequency,
+        emiFrequency: creditOffer.paymentType === 'BULLET' ? 'NONE' : 'MONTHLY', // Set to MONTHLY as it's the most common frequency
         status: 'PROPOSED',
         requestByUserId: user.uid,
         requestedToUserId: creditOffer.offerByUserId,
@@ -202,7 +202,37 @@ export class CreditService {
     createCreditRequestDto: CreateCreditRequestDto,
     user: DecodedIdToken
   ) {
-    const { amount, lendingTerm, timeUnit, interestRate, paymentType, emiFrequency } = createCreditRequestDto;
+    const { 
+      amount, 
+      lendingTerm, 
+      timeUnit, 
+      interestRate, 
+      paymentType, 
+      emiFrequency,
+      lenderMobileNo,
+      purposeOfLoan 
+    } = createCreditRequestDto;
+
+    // Format the lender's phone number
+    const formattedLenderPhone = this.formatPhoneNumber(lenderMobileNo);
+
+    // Find lender by phone number
+    const lender = await this.prisma.user.findFirst({
+      where: {
+        phoneNumber: formattedLenderPhone
+      }
+    });
+
+    // Find borrower (current user) by uid
+    const borrower = await this.prisma.user.findFirst({
+      where: {
+        phoneNumber: user.phone_number
+      }
+    });
+
+    if (!borrower) {
+      throw new NotFoundException('Borrower not found');
+    }
 
     // Create a new credit request in the database
     const creditRequest = await this.prisma.creditRequest.create({
@@ -212,12 +242,22 @@ export class CreditService {
         timeUnit,
         interestRate,
         paymentType,
-        emiFrequency,
-        requestByUserId: user.uid,
-        requestedToUserId: createCreditRequestDto.requestedToUserId
+        emiFrequency: paymentType === 'BULLET' ? 'NONE' : emiFrequency, // Always include an emiFrequency value
+        requestByUserId: borrower.id,
+        requestedToUserId: lender ? lender.id : formattedLenderPhone,
+        status: CreditRequestStatus.PROPOSED,
+        versionNumber: 1,
+        isLatest: true,
+        metadata: { purposeOfLoan }
       },
     });
 
-    return creditRequest;
+    // Update parentRequestId to be the same as id
+    const updatedRequest = await this.prisma.creditRequest.update({
+      where: { id: creditRequest.id },
+      data: { parentRequestId: creditRequest.id }
+    });
+
+    return updatedRequest;
   }
 }
