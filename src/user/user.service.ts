@@ -84,7 +84,18 @@ export class UserService extends BaseService {
     }
 
     // Clean up the update data
-    const dataToUpdate = {
+    const dataToUpdate: {
+      aadhaarNumber?: any;
+      kyc?: boolean;
+      aadharcard?: any;
+      profileImageUrl?: string;
+      joinedReferralCode?: any;
+      businessType?: any;
+      date_of_birth?: any;
+      name?: any;
+      plan?: any;
+      planExpiry?: Date;
+    } = {
       ...(updateData.name && { name: updateData.name }),
       ...(updateData.date_of_birth && { date_of_birth: updateData.date_of_birth }),
       ...(updateData.businessType && { businessType: updateData.businessType }),
@@ -94,6 +105,14 @@ export class UserService extends BaseService {
       ...(updateData.kyc !== undefined && { kyc: updateData.kyc === 'true' || updateData.kyc === true }),
       ...(updateData.aadhaarNumber && { aadhaarNumber: updateData.aadhaarNumber }),
     };
+
+    // Update plan fields if provided
+    if (updateData.plan) {
+      dataToUpdate.plan = updateData.plan;
+    }
+    if (updateData.planExpiry) {
+      dataToUpdate.planExpiry = new Date(updateData.planExpiry);
+    }
 
     // Update user profile in database only if we have data to update
     if (Object.keys(dataToUpdate).length === 0 && !file) {

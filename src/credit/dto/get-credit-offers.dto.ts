@@ -5,7 +5,11 @@ import { Transform } from 'class-transformer';
 export class GetCreditOffersDto {
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
   filterByMe?: boolean;
 
   @IsOptional()

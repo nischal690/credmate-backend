@@ -32,4 +32,9 @@ export class GiveCreditDto {
   @IsNotEmpty()
   @IsIn(['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'])
   emiFrequency: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(['BASIC', 'STANDARD', 'PREMIUM'])
+  plan: string;
 }

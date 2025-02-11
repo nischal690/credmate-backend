@@ -47,7 +47,7 @@
     "class-validator": "^0.14.1",
     "compression": "^1.7.5",
     "date-fns": "^4.1.0",
-    "firebase-admin": "^13.0.0",
+    "firebase-admin": "^13.0.2",
     "firebase-functions": "^6.1.1",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",

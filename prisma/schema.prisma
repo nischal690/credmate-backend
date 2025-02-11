@@ -1,5 +1,3 @@
-// This file is using the Prisma schema language.
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,71 +8,61 @@ datasource db {
   relationMode = "prisma"
 }
 
-// ======= User Service =======
-enum UserPlan {
-  FREE
-  PRO_INDIVIDUAL
-  PRO_BUSINESS
-  PRIORITY_BUSINESS
-}
-
 model User {
-  id              String    @id @default(uuid())
-  email           String?   @unique
-  password        String?
-  name            String?
-  businessType    String?
-  date_of_birth   DateTime?
-  phoneNumber     String    @unique
-  aadhaarNumber   String?   @unique
-  aadharcard      String?   // URL or path to stored Aadhar card image/document
-  panNumber       String?   @unique
-  profileImageUrl String?
-  plan            UserPlan  @default(FREE)
-  referralCode    String    @unique @default(dbgenerated("substring(upper(replace(cast(gen_random_uuid() as varchar), '-', '')), 1, 6)")) // 6-char alphanumeric code
-  joinedReferralCode  String?   // Referral code used when joining
-  planPrice       Float?    // New field for storing plan price
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  metadata        Json?     // For extensible user properties
-  status          String    @default("ACTIVE") // ACTIVE, SUSPENDED, DELETED
-  credmateScore   Int       @default(0)  // New field for Credmate score
-  creditScore     Int       @default(0)  // New field for credit score
-  kyc            Boolean    @default(false)  // KYC verification status
+  id                 String    @id @default(uuid())
+  email              String?   @unique
+  password           String?
+  name               String?
+  businessType       String?
+  date_of_birth      DateTime?
+  phoneNumber        String    @unique
+  aadhaarNumber      String?   @unique
+  panNumber          String?   @unique
+  profileImageUrl    String?
+  plan               UserPlan  @default(FREE)
+  referralCode       String    @unique @default(dbgenerated("\"substring\"(upper(replace(((gen_random_uuid())::character varying)::text, '-'::text, ''::text)), 1, 6)"))
+  planPrice          Float?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  metadata           Json?
+  status             String    @default("ACTIVE")
+  credmateScore      Int       @default(0)
+  creditScore        Int       @default(0)
+  joinedReferralCode String?
+  kyc                Boolean   @default(false)
+  aadharcard         String?
 
   @@map("users")
 }
 
-// ======= Notification Service =======
 model Notification {
-  id         String    @id @default(uuid())
-  userId     String    // No direct relation, just store the ID
-  type       String
-  title      String
-  message    String
-  data       Json?
-  isRead     Boolean   @default(false)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  expiresAt  DateTime?
-  metadata   Json?     // For additional notification data
+  id        String    @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiresAt DateTime?
+  metadata  Json?
 
   @@index([userId])
   @@map("notifications")
 }
 
-// ======= Profile Service =======
 model SavedProfile {
-  id            String    @id @default(uuid())
-  savedByUserId String    // User who saved the profile
-  savedUserId   String    // User who was saved
-  name          String?   // Cached name of saved user
-  mobileNumber  String?   // Cached mobile of saved user
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime? 
-  isActive      Boolean   @default(true)
-  transactionCount Int    @default(0)
-  metadata      Json?     // For additional profile data
+  id               String    @id @default(uuid())
+  savedByUserId    String
+  savedUserId      String
+  name             String?
+  mobileNumber     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime?
+  isActive         Boolean   @default(true)
+  transactionCount Int       @default(0)
+  metadata         Json?
 
   @@unique([savedByUserId, savedUserId])
   @@index([savedByUserId])
@@ -82,75 +70,200 @@ model SavedProfile {
   @@map("saved_profiles")
 }
 
-// ======= Referral Service =======
-enum ReferralStatus {
-  PENDING
-  COMPLETED
-  FAILED
-}
-
 model Referral {
-  id              String         @id @default(uuid())
-  referrerUserId  String        // No direct relation
-  referredUserId  String        // No direct relation
-  referralCode    String        @unique
-  status          ReferralStatus @default(PENDING)
-  rewardIssued    Boolean       @default(false)
-  rewardPercentage Float        @default(0)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  metadata        Json?         // For additional referral data
+  id               String         @id @default(uuid())
+  referrerUserId   String
+  referredUserId   String
+  referralCode     String         @unique
+  status           ReferralStatus @default(PENDING)
+  rewardIssued     Boolean        @default(false)
+  rewardPercentage Float          @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  metadata         Json?
 
   @@index([referrerUserId])
   @@index([referredUserId])
   @@map("referrals")
 }
 
-// ======= Announcement Service =======
 model Announcement {
-  id          String    @id @default(uuid())
-  title       String
-  message     String
-  type        String    // Type of announcement
-  isActive    Boolean   @default(true)
-  startDate   DateTime  @default(now())
-  endDate     DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  metadata    Json?     // For additional announcement data
+  id        String    @id @default(uuid())
+  title     String
+  message   String
+  type      String
+  isActive  Boolean   @default(true)
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  metadata  Json?
 
   @@map("announcements")
 }
 
-// ======= Credit Service =======
-enum CreditRequestStatus {
-  PROPOSED
-  ACCEPTED
-  REJECTED
-  NEGOTIATED
-}
-
 model CreditRequest {
   id                String              @id @default(uuid())
-  parentRequestId   String?            // For tracking negotiation history
-  requestByUserId   String             // No direct relation
-  requestedToUserId String             // No direct relation
+  parentRequestId   String?
+  requestByUserId   String
+  requestedToUserId String
   loanAmount        Float
   loanTerm          Int
-  timeUnit          String             // DAYS, MONTHS, YEARS
+  timeUnit          String
   interestRate      Float
-  paymentType       String             // EMI, BULLET
-  emiFrequency      String             // NONE, DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
+  paymentType       String
+  emiFrequency      String
   status            CreditRequestStatus @default(PROPOSED)
-  versionNumber     Int                @default(1)
-  isLatest         Boolean            @default(true)
-  createdAt         DateTime           @default(now())
-  metadata          Json?              // For additional request data
+  versionNumber     Int                 @default(1)
+  isLatest          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  metadata          Json?
 
   @@index([parentRequestId])
   @@index([requestByUserId])
   @@index([requestedToUserId])
   @@map("credit_requests")
+}
+
+model CreditOffer {
+  id            String            @id @default(uuid())
+  parentOfferId String?
+  offerByUserId String
+  offerToUserId String
+  loanAmount    Float
+  loanTerm      Int
+  timeUnit      String
+  interestRate  Float
+  paymentType   String
+  emiFrequency  String?
+  status        CreditOfferStatus @default(PROPOSED)
+  versionNumber Int               @default(1)
+  isLatest      Boolean           @default(true)
+  expiryDate    DateTime?
+  plan          String?           @default("BASIC")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  metadata      Json?
+
+  @@index([parentOfferId])
+  @@index([offerByUserId])
+  @@index([offerToUserId])
+  @@map("credit_offers")
+}
+
+model Credit {
+  id                String       @id @default(uuid())
+  creditType        CreditType   @default(PERSONAL)
+  requestId         String
+  requestByUserId   String
+  requestedToUserId String
+  loanAmount        Float
+  loanTerm          Int
+  timeUnit          String
+  interestRate      Float
+  paymentType       String
+  emiFrequency      String
+  status            CreditStatus @default(ACTIVE)
+  offeredId         String?
+  recoveryMode      Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  finalizedAt       DateTime?
+  offeredByUserId   String
+  offeredToUserId   String
+  metadata          Json?
+
+  @@index([requestId])
+  @@index([requestByUserId])
+  @@index([requestedToUserId])
+  @@index([offeredByUserId])
+  @@index([offeredToUserId])
+  @@map("credits")
+}
+
+model ReportedBorrower {
+  id                     String   @id @default(uuid())
+  reportedByUserId       String
+  mobileNumber           String
+  unpaidAmount           Float
+  dueDate                DateTime
+  confirmedByBorrower    Boolean  @default(false)
+  borrowerCreatedAccount Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  recoveryMode           Boolean  @default(false)
+  metadata               Json?
+
+  @@index([reportedByUserId])
+  @@map("reported_borrowers")
+}
+
+model Transaction {
+  id            String   @id @default(uuid())
+  uid           String
+  amount        Float
+  confirmed     Boolean  @default(false)
+  confirmedData Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  metadata      Json?
+
+  @@index([uid])
+  @@map("transactions")
+}
+
+model Payment {
+  id            String     @id @default(uuid())
+  uid           String
+  amount        Float
+  requestRaised Boolean    @default(false)
+  paid          Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  createdTime   String
+  metadata      Json?
+  paymentFor    PaymentFor @default(CONTRACT)
+  updatedAt     DateTime   @default(now()) @updatedAt
+
+  @@index([uid])
+  @@map("payments")
+}
+
+model AllLenderRequest {
+  id           String   @id @default(uuid())
+  uid          String
+  loanAmount   Float
+  loanTerms    Int
+  timeUnit     String
+  interestRate Float
+  purpose      String
+  paymentType  String
+  emiFrequency String?
+  emiAmount    Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  status       String   @default("PENDING")
+  metadata     Json?
+
+  @@index([uid])
+  @@map("alllenderrequests")
+}
+
+enum UserPlan {
+  FREE
+  PRO_INDIVIDUAL
+  PRO_BUSINESS
+  PRIORITY_BUSINESS
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum CreditRequestStatus {
+  PROPOSED
+  ACCEPTED
+  REJECTED
+  NEGOTIATED
 }
 
 enum CreditOfferStatus {
@@ -159,31 +272,6 @@ enum CreditOfferStatus {
   REJECTED
   EXPIRED
   NEGOTIATED
-}
-
-model CreditOffer {
-  id                String            @id @default(uuid())
-  parentOfferId     String?           // For tracking negotiation history
-  offerByUserId     String            // User who created the offer
-  offerToUserId     String            // User to whom offer is made
-  loanAmount       Float
-  loanTerm         Int
-  timeUnit         String            // DAYS, MONTHS, YEARS
-  interestRate     Float
-  paymentType      String            // EMI, BULLET
-  emiFrequency     String?            // NONE, DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
-  status           CreditOfferStatus @default(PROPOSED)
-  versionNumber    Int               @default(1)
-  isLatest        Boolean           @default(true)
-  expiryDate      DateTime?         // When this offer expires
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  metadata         Json?            // For additional offer data
-  
-  @@index([parentOfferId])
-  @@index([offerByUserId])
-  @@index([offerToUserId])
-  @@map("credit_offers")
 }
 
 enum CreditType {
@@ -200,105 +288,7 @@ enum CreditStatus {
   CANCELLED
 }
 
-model Credit {
-  id                String        @id @default(uuid())
-  creditType        CreditType    @default(PERSONAL)
-  requestId         String        // Reference to the original credit request
-  requestByUserId   String        // No direct relation
-  requestedToUserId String        // No direct relation
-  loanAmount        Float
-  loanTerm          Int
-  timeUnit          String        // DAYS, MONTHS, YEARS
-  interestRate      Float
-  paymentType       String        // EMI, BULLET
-  emiFrequency      String        // NONE, DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY
-  status            CreditStatus  @default(ACTIVE)
-  offeredId         String?       // ID of the offer that was accepted
-  recoveryMode      Boolean       @default(false)
-  createdAt         DateTime      @default(now())
-  finalizedAt       DateTime?
-  offeredByUserId   String        // No direct relation
-  offeredToUserId   String        // No direct relation
-  metadata          Json?         // For additional credit data
-
-  @@index([requestId])
-  @@index([requestByUserId])
-  @@index([requestedToUserId])
-  @@index([offeredByUserId])
-  @@index([offeredToUserId])
-  @@map("credits")
-}
-
-// ======= Risk Service =======
-model ReportedBorrower {
-  id                      String    @id @default(uuid())
-  reportedByUserId       String    // No direct relation
-  mobileNumber           String
-  unpaidAmount           Float
-  dueDate                DateTime
-  confirmedByBorrower    Boolean   @default(false)
-  borrowerCreatedAccount Boolean   @default(false)
-  createdAt              DateTime  @default(now())
-  recoveryMode           Boolean   @default(false)
-  metadata               Json?     // For additional report data
-
-  @@index([reportedByUserId])
-  @@map("reported_borrowers")
-}
-
-// ======= Transaction Service =======
-model Transaction {
-  id            String    @id @default(uuid())
-  uid           String    // User ID associated with the transaction
-  amount        Float     // Transaction amount
-  confirmed     Boolean   @default(false)
-  confirmedData Json?     // Data related to transaction confirmation
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  metadata      Json?     // For extensible transaction properties
-
-  @@map("transactions")
-  @@index([uid])
-}
-
-// ======= Payment Service =======
 enum PaymentFor {
   SUBSCRIPTION
-  CREDIT
-  OTHER
-}
-
-model Payment {
-  id            String     @id @default(uuid())
-  uid           String    // User ID
-  amount        Float
-  paymentFor    PaymentFor
-  requestRaised Boolean   @default(false)
-  paid          Boolean   @default(false)
-  createdTime   String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  @@map("payments")
-}
-
-// ======= All Lender Request Service =======
-model AllLenderRequest {
-  id            String    @id @default(uuid())
-  uid           String    // User ID of the requester
-  loanAmount    Float
-  loanTerms     Int
-  timeUnit      String    // DAYS, MONTHS, YEARS
-  interestRate  Float
-  purpose       String    // Purpose of the loan
-  paymentType   String    // ONE_TIME, EMI
-  emiFrequency  String?   // NONE, DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY (null if ONE_TIME payment)
-  emiAmount     Float?    // null if ONE_TIME payment
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
-  metadata      Json?     // For any additional data
-
-  @@index([uid])
-  @@map("alllenderrequests")
+  CONTRACT
 }
