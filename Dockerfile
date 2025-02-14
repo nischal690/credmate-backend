@@ -21,7 +21,7 @@ RUN npm ci --prefer-offline --no-audit
 RUN npx prisma generate
 
 # Copy source code
-COPY --chown=appuser:appgroup . .
+COPY --chown=appuser:appgroup . . 
 
 # Build the application
 RUN npm run build
@@ -56,9 +56,8 @@ COPY --from=builder --chown=appuser:appgroup /app/prisma ./prisma
 # Switch to non-root user
 USER appuser
 
-# Install production dependencies only
-RUN npm ci --prefer-offline --no-audit --production && \
-    npm cache clean --force
+# Clear npm cache and install production dependencies
+RUN rm -rf ~/.npm && npm ci --prefer-offline --no-audit --production && npm cache clean --force
 
 # Expose application port
 EXPOSE 3000
