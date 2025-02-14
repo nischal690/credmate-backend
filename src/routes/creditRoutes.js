@@ -82,4 +82,68 @@ router.post('/give-credit', verifyToken, async (req, res) => {
     }
 });
 
+// POST /credit/request-credit
+router.post('/request-credit', verifyToken, async (req, res) => {
+    try {
+        const {
+            lenderMobileNo,
+            loanAmount,
+            loanTerm,
+            timeUnit,
+            interestRate,
+            purposeOfLoan,
+            paymentType,
+            emiFrequency
+        } = req.body;
+
+        // Get the borrower's details from Firebase token
+        const borrowerFirebaseUid = req.user.uid;
+        const borrower = await prisma.user.findFirst({
+            where: {
+                phoneNumber: req.user.phone_number
+            }
+        });
+
+        if (!borrower) {
+            return res.status(404).json({ error: 'Borrower not found' });
+        }
+
+        // Find lender by mobile number
+        const lender = await prisma.user.findFirst({
+            where: {
+                phoneNumber: lenderMobileNo
+            }
+        });
+
+        // Create credit request
+        const creditRequest = await prisma.creditRequest.create({
+            data: {
+                requestByUserId: borrower.id,
+                requestedToUserId: lender ? lender.id : lenderMobileNo,
+                loanAmount: parseFloat(loanAmount),
+                loanTerm: parseInt(loanTerm),
+                timeUnit: timeUnit,
+                interestRate: parseFloat(interestRate),
+                paymentType: paymentType,
+                emiFrequency: emiFrequency,
+                status: 'PROPOSED',
+                versionNumber: 1,
+                metadata: { purposeOfLoan },
+                isLatest: true
+            }
+        });
+
+        // Update the parentRequestId to be the same as id
+        const updatedRequest = await prisma.creditRequest.update({
+            where: { id: creditRequest.id },
+            data: { parentRequestId: creditRequest.id }
+        });
+
+        res.status(201).json(updatedRequest);
+    } catch (error) {
+        console.error('Error creating credit request:', error);
+        res.status(500).json({ error: 'Failed to create credit request' });
+    }
+});
+
 module.exports = router;

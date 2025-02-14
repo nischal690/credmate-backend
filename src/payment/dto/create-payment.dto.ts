@@ -1,11 +1,6 @@
 import { IsNumber, Min, IsEnum, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-
-export enum PaymentFor {
-  SUBSCRIPTION = 'SUBSCRIPTION',
-  CREDIT = 'CREDIT',
-  OTHER = 'OTHER'
-}
+import { PaymentFor } from '@prisma/client';
 
 export class CreatePaymentDto {
   @ApiProperty({ description: 'Amount to be paid' })

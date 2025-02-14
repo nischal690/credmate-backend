@@ -61,6 +61,11 @@ export class CreditService {
       where: {
         phoneNumber: user.phoneNumber, // Already formatted by FirebaseAuthGuard
       },
+      select: {
+        id: true,
+        phoneNumber: true,
+        name: true,
+      },
     });
 
     if (!lender) {
@@ -78,6 +83,11 @@ export class CreditService {
     const borrower = await this.prisma.user.findFirst({
       where: {
         phoneNumber: formattedPhoneNumber,
+      },
+      select: {
+        id: true,
+        phoneNumber: true,
+        name: true,
       },
     });
 
@@ -108,16 +118,21 @@ export class CreditService {
   }
 
   async getCreditOffers(filters: GetCreditOffersDto, user: DecodedIdToken) {
+    this.logger.debug('Getting credit offers with filters:', JSON.stringify(filters));
+    this.logger.debug('User context:', JSON.stringify(user));
+
     const where: any = {
       isLatest: true,
     };
 
     // Handle filterByMe option
     if (filters.filterByMe) {
+      this.logger.debug('Applying filterByMe with user.uid:', user.uid);
       where.OR = [
         { offerByUserId: user.uid },
         { offerToUserId: user.uid }
       ];
+      this.logger.debug('Where clause after filterByMe:', JSON.stringify(where));
     } else {
       // Apply regular user filters only if not filtering by logged-in user
       if (filters.offerByUserId) {
@@ -220,14 +235,24 @@ export class CreditService {
     const lender = await this.prisma.user.findFirst({
       where: {
         phoneNumber: formattedLenderPhone
-      }
+      },
+      select: {
+        id: true,
+        phoneNumber: true,
+        name: true,
+      },
     });
 
     // Find borrower (current user) by uid
     const borrower = await this.prisma.user.findFirst({
       where: {
         phoneNumber: user.phone_number
-      }
+      },
+      select: {
+        id: true,
+        phoneNumber: true,
+        name: true,
+      },
     });
 
     if (!borrower) {
