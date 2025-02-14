@@ -32,6 +32,18 @@ export class CreditController {
     return this.creditService.createCreditOffer(giveCreditDto, request.user);
   }
 
+  @Get('offers/by-me')
+  @UseGuards(FirebaseAuthGuard)
+  async getCreditOffersByUser(@Req() request: RequestWithUser) {
+    return this.creditService.getCreditOffersByUser(request.user);
+  }
+
+  @Get('offers/to-me')
+  @UseGuards(FirebaseAuthGuard)
+  async getCreditOffersToUser(@Req() request: RequestWithUser) {
+    return this.creditService.getCreditOffersToUser(request.user);
+  }
+
   @Get('offers')
   @UseGuards(FirebaseAuthGuard)
   async getCreditOffers(@Query() filters: GetCreditOffersDto, @Req() request: RequestWithUser) {
