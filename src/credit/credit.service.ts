@@ -117,31 +117,137 @@ export class CreditService {
     return updatedOffer;
   }
 
+  async getCreditOffersByUser(user: DecodedIdToken) {
+    this.logger.debug('Getting credit offers made by user:', JSON.stringify(user));
+
+    if (!user.phoneNumber) {
+      throw new BadRequestException('User must have a verified phone number');
+    }
+
+    // Format the phone number to match our database format
+    const formattedPhoneNumber = this.formatPhoneNumber(user.phoneNumber);
+    this.logger.debug('Formatted phone number:', formattedPhoneNumber);
+
+    // Find the user by phone number
+    const dbUser = await this.prisma.user.findFirst({
+      where: {
+        phoneNumber: formattedPhoneNumber
+      }
+    });
+
+    if (!dbUser) {
+      throw new NotFoundException('User not found with the provided phone number');
+    }
+
+    this.logger.debug('Found user:', JSON.stringify(dbUser));
+
+    // Get offers made by the user
+    const offers = await this.prisma.creditOffer.findMany({
+      where: {
+        offerByUserId: dbUser.id,
+        isLatest: true // Only get the latest version of each offer
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    this.logger.debug(`Found ${offers.length} offers made by user ${dbUser.id}`);
+    return offers;
+  }
+
+  async getCreditOffersToUser(user: DecodedIdToken) {
+    this.logger.debug('Getting credit offers made to user:', JSON.stringify(user));
+
+    if (!user.phoneNumber) {
+      throw new BadRequestException('User must have a verified phone number');
+    }
+
+    // Format the phone number to match our database format
+    const formattedPhoneNumber = this.formatPhoneNumber(user.phoneNumber);
+    this.logger.debug('Formatted phone number:', formattedPhoneNumber);
+
+    // Find the user by phone number
+    const dbUser = await this.prisma.user.findFirst({
+      where: {
+        phoneNumber: formattedPhoneNumber
+      }
+    });
+
+    if (!dbUser) {
+      throw new NotFoundException('User not found with the provided phone number');
+    }
+
+    this.logger.debug('Found user:', JSON.stringify(dbUser));
+
+    // Get offers made to the user
+    const offers = await this.prisma.creditOffer.findMany({
+      where: {
+        offerToUserId: dbUser.id,
+        isLatest: true // Only get the latest version of each offer
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    this.logger.debug(`Found ${offers.length} offers made to user ${dbUser.id}`);
+    return offers;
+  }
+
   async getCreditOffers(filters: GetCreditOffersDto, user: DecodedIdToken) {
     this.logger.debug('Getting credit offers with filters:', JSON.stringify(filters));
     this.logger.debug('User context:', JSON.stringify(user));
 
-    const where: any = {
-      isLatest: true,
-    };
-
-    // Handle filterByMe option
+    // If filterByMe is true, use phone number from Firebase token to find user
     if (filters.filterByMe) {
-      this.logger.debug('Applying filterByMe with user.uid:', user.uid);
-      where.OR = [
-        { offerByUserId: user.uid },
-        { offerToUserId: user.uid }
-      ];
-      this.logger.debug('Where clause after filterByMe:', JSON.stringify(where));
-    } else {
-      // Apply regular user filters only if not filtering by logged-in user
-      if (filters.offerByUserId) {
-        where.offerByUserId = filters.offerByUserId;
+      if (!user.phoneNumber) {
+        throw new BadRequestException('User must have a verified phone number');
       }
 
-      if (filters.offerToUserId) {
-        where.offerToUserId = filters.offerToUserId;
+      // Format the phone number to match our database format
+      const formattedPhoneNumber = this.formatPhoneNumber(user.phoneNumber);
+
+      // Find the user by phone number
+      const dbUser = await this.prisma.user.findFirst({
+        where: {
+          phoneNumber: formattedPhoneNumber
+        }
+      });
+
+      if (!dbUser) {
+        throw new NotFoundException('User not found with the provided phone number');
       }
+
+      // Use the found user's ID to filter credit offers
+      const where: any = {
+        OR: [
+          { offerByUserId: dbUser.id },
+          { offerToUserId: dbUser.id }
+        ]
+      };
+
+      this.logger.debug('Where clause after filterByMe:', JSON.stringify(where));
+
+      const offers = await this.prisma.creditOffer.findMany({
+        where,
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      return offers;
+    }
+
+    // If not filtering by logged-in user, proceed with regular filters
+    const where: any = {};
+
+    if (filters.offerByUserId) {
+      where.offerByUserId = filters.offerByUserId;
+    }
+
+    if (filters.offerToUserId) {
+      where.offerToUserId = filters.offerToUserId;
     }
 
     if (filters.status) {
