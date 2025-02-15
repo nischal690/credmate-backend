@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { CreateCreditRequestDto, CreditRequestStatus } from './dto/create-credit-request.dto';
+import { CreditOffer, User, CreditRequest } from '@prisma/client';
 
 // Custom type for our Firebase user from the auth guard
 interface FirebaseUser {
@@ -32,6 +33,12 @@ interface RequestCreditDto {
   loanTerm?: number;
   timeUnit?: string;
   note?: string;
+}
+
+// Type for credit offer with related user data
+interface CreditOfferWithUsers extends CreditOffer {
+  offerByUser: Pick<User, 'id' | 'name' | 'phoneNumber'>;
+  offerToUser: Pick<User, 'id' | 'name' | 'phoneNumber'>;
 }
 
 @Injectable()
@@ -288,6 +295,60 @@ export class CreditService {
         createdAt: 'desc',
       },
     });
+  }
+
+  async getCreditOfferById(offerId: string, user: FirebaseUser): Promise<CreditOfferWithUsers> {
+    if (!user.phoneNumber) {
+      throw new BadRequestException('User must have a verified phone number');
+    }
+
+    // First fetch the credit offer
+    const creditOffer = await this.prisma.creditOffer.findUnique({
+      where: {
+        id: offerId
+      }
+    });
+
+    if (!creditOffer) {
+      throw new NotFoundException('Credit offer not found');
+    }
+
+    // Then fetch the related users
+    const [offerByUser, offerToUser] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: creditOffer.offerByUserId },
+        select: {
+          id: true,
+          name: true,
+          phoneNumber: true
+        }
+      }),
+      this.prisma.user.findUnique({
+        where: { id: creditOffer.offerToUserId },
+        select: {
+          id: true,
+          name: true,
+          phoneNumber: true
+        }
+      })
+    ]);
+
+    if (!offerByUser || !offerToUser) {
+      throw new NotFoundException('Related users not found');
+    }
+
+    // Check if the user is either the lender or borrower
+    const userPhone = user.phoneNumber;
+    if (offerByUser.phoneNumber !== userPhone && 
+        offerToUser.phoneNumber !== userPhone) {
+      throw new BadRequestException('You do not have permission to view this credit offer');
+    }
+
+    return {
+      ...creditOffer,
+      offerByUser,
+      offerToUser
+    };
   }
 
   async createCreditRequest(requestCreditDto: RequestCreditDto, user: DecodedIdToken) {
