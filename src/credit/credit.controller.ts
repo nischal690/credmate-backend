@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Req, Query } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Query, Param, Param as Param } from '@nestjs/common';
 import { CreditService } from './credit.service';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { GiveCreditDto } from './dto/give-credit.dto';
@@ -48,6 +48,12 @@ export class CreditController {
   @UseGuards(FirebaseAuthGuard)
   async getCreditOffers(@Query() filters: GetCreditOffersDto, @Req() request: RequestWithUser) {
     return this.creditService.getCreditOffers(filters, request.user);
+  }
+
+  @Get('offers/:id')
+  @UseGuards(FirebaseAuthGuard)
+  async getCreditOfferById(@Param('id') id: string, @Req() request: RequestWithUser) {
+    return this.creditService.getCreditOfferById(id, request.user);
   }
 
   @Post('offers/request')

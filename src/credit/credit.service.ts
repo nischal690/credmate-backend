@@ -290,6 +290,47 @@ export class CreditService {
     });
   }
 
+  async getCreditOfferById(offerId: string, user: FirebaseUser) {
+    if (!user.phoneNumber) {
+      throw new BadRequestException('User must have a verified phone number');
+    }
+
+    const creditOffer = await this.prisma.creditOffer.findUnique({
+      where: {
+        id: offerId
+      },
+      include: {
+        offerByUser: {
+          select: {
+            id: true,
+            name: true,
+            phoneNumber: true
+          }
+        },
+        offerToUser: {
+          select: {
+            id: true,
+            name: true,
+            phoneNumber: true
+          }
+        }
+      }
+    });
+
+    if (!creditOffer) {
+      throw new NotFoundException('Credit offer not found');
+    }
+
+    // Check if the user is either the lender or borrower
+    const userPhone = user.phoneNumber;
+    if (creditOffer.offerByUser.phoneNumber !== userPhone && 
+        creditOffer.offerToUser.phoneNumber !== userPhone) {
+      throw new BadRequestException('You do not have permission to view this credit offer');
+    }
+
+    return creditOffer;
+  }
+
   async createCreditRequest(requestCreditDto: RequestCreditDto, user: DecodedIdToken) {
     const { offerId, loanAmount, loanTerm, timeUnit, note } = requestCreditDto;
 
