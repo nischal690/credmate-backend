@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { CreateCreditRequestDto, CreditRequestStatus } from './dto/create-credit-request.dto';
+import { CreditOffer, User, CreditRequest } from '@prisma/client';
 
 // Custom type for our Firebase user from the auth guard
 interface FirebaseUser {
@@ -32,6 +33,12 @@ interface RequestCreditDto {
   loanTerm?: number;
   timeUnit?: string;
   note?: string;
+}
+
+// Type for credit offer with related user data
+interface CreditOfferWithUsers extends CreditOffer {
+  offerByUser: Pick<User, 'id' | 'name' | 'phoneNumber'>;
+  offerToUser: Pick<User, 'id' | 'name' | 'phoneNumber'>;
 }
 
 @Injectable()
@@ -290,7 +297,7 @@ export class CreditService {
     });
   }
 
-  async getCreditOfferById(offerId: string, user: FirebaseUser) {
+  async getCreditOfferById(offerId: string, user: FirebaseUser): Promise<CreditOfferWithUsers> {
     if (!user.phoneNumber) {
       throw new BadRequestException('User must have a verified phone number');
     }
@@ -315,7 +322,7 @@ export class CreditService {
           }
         }
       }
-    });
+    }) as CreditOfferWithUsers | null;
 
     if (!creditOffer) {
       throw new NotFoundException('Credit offer not found');
