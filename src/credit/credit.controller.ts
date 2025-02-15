@@ -1,12 +1,14 @@
-import { Controller, Post, Get, Body, UseGuards, Req, Query, Param, Param as Param } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Query, Param } from '@nestjs/common';
 import { CreditService } from './credit.service';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { GiveCreditDto } from './dto/give-credit.dto';
 import { GetCreditOffersDto } from './dto/get-credit-offers.dto';
 import { RequestCreditDto } from './dto/request-credit.dto';
 import { CreateCreditRequestDto } from './dto/create-credit-request.dto';
+import { CreditStatusUpdateDto } from './dto/credit-status-update.dto';
 import { Request } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
+import { CreditOfferWithUsers } from './types/credit.types';
 
 // Extend Express Request to include our user type
 interface RequestWithUser extends Request {
@@ -60,5 +62,14 @@ export class CreditController {
   @UseGuards(FirebaseAuthGuard)
   async requestCredit(@Body() requestCreditDto: RequestCreditDto, @Req() request: RequestWithUser) {
     return this.creditService.createCreditRequest(requestCreditDto, request.user);
+  }
+
+  @Post('creditstatusupdated')
+  @UseGuards(FirebaseAuthGuard)
+  async updateCreditStatus(
+    @Body() creditStatusUpdateDto: CreditStatusUpdateDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.creditService.updateCreditStatus(creditStatusUpdateDto, request.user);
   }
 }
