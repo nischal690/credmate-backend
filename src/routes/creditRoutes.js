@@ -146,4 +146,88 @@ router.post('/request-credit', verifyToken, async (req, res) => {
     }
 });
 
+// POST /credit/creditstatusupdated
+router.post('/creditstatusupdated', verifyToken, async (req, res) => {
+    try {
+        const { offerId, requestId, status } = req.body;
+
+        // Validate that either offerId or requestId is provided, but not both
+        if ((!offerId && !requestId) || (offerId && requestId)) {
+            return res.status(400).json({ error: 'Please provide either offerId or requestId, but not both' });
+        }
+
+        if (!status) {
+            return res.status(400).json({ error: 'Status is required' });
+        }
+
+        let creditData = {
+            creditType: 'PERSONAL',
+            status: status,
+            recoveryMode: false,
+            requestedToUserId: '',
+            requestByUserId: '',
+        };
+
+        if (offerId) {
+            // Fetch credit offer details
+            const creditOffer = await prisma.creditOffer.findUnique({
+                where: { id: offerId }
+            });
+
+            if (!creditOffer) {
+                return res.status(404).json({ error: 'Credit offer not found' });
+            }
+
+            creditData = {
+                ...creditData,
+                requestId: offerId,
+                loanAmount: creditOffer.loanAmount,
+                loanTerm: creditOffer.loanTerm,
+                timeUnit: creditOffer.timeUnit,
+                interestRate: creditOffer.interestRate,
+                paymentType: creditOffer.paymentType,
+                emiFrequency: creditOffer.emiFrequency || '',
+                offeredId: offerId,
+                offeredByUserId: creditOffer.offerByUserId,
+                offeredToUserId: creditOffer.offerToUserId
+            };
+        } else {
+            // Fetch credit request details
+            const creditRequest = await prisma.creditRequest.findUnique({
+                where: { id: requestId }
+            });
+
+            if (!creditRequest) {
+                return res.status(404).json({ error: 'Credit request not found' });
+            }
+
+            creditData = {
+                ...creditData,
+                requestId: requestId,
+                loanAmount: creditRequest.loanAmount,
+                loanTerm: creditRequest.loanTerm,
+                timeUnit: creditRequest.timeUnit,
+                interestRate: creditRequest.interestRate,
+                paymentType: creditRequest.paymentType,
+                emiFrequency: creditRequest.emiFrequency || '',
+                requestByUserId: creditRequest.requestByUserId,
+                requestedToUserId: creditRequest.requestedToUserId,
+                offeredId: '',
+                offeredByUserId: '',
+                offeredToUserId: ''
+            };
+        }
+
+        // Create credit entry
+        const creditEntry = await prisma.credit.create({
+            data: creditData
+        });
+
+        res.status(201).json(creditEntry);
+    } catch (error) {
+        console.error('Error creating credit entry:', error);
+        res.status(500).json({ error: 'Failed to create credit entry' });
+    }
+});
+
 module.exports = router;

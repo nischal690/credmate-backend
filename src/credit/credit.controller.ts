@@ -8,7 +8,6 @@ import { CreateCreditRequestDto } from './dto/create-credit-request.dto';
 import { CreditStatusUpdateDto } from './dto/credit-status-update.dto';
 import { Request } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
-import { CreditOfferWithUsers } from './types/credit.types';
 
 // Extend Express Request to include our user type
 interface RequestWithUser extends Request {
