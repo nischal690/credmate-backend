@@ -302,40 +302,53 @@ export class CreditService {
       throw new BadRequestException('User must have a verified phone number');
     }
 
+    // First fetch the credit offer
     const creditOffer = await this.prisma.creditOffer.findUnique({
       where: {
         id: offerId
-      },
-      include: {
-        offerByUser: {
-          select: {
-            id: true,
-            name: true,
-            phoneNumber: true
-          }
-        },
-        offerToUser: {
-          select: {
-            id: true,
-            name: true,
-            phoneNumber: true
-          }
-        }
       }
-    }) as CreditOfferWithUsers | null;
+    });
 
     if (!creditOffer) {
       throw new NotFoundException('Credit offer not found');
     }
 
+    // Then fetch the related users
+    const [offerByUser, offerToUser] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: creditOffer.offerByUserId },
+        select: {
+          id: true,
+          name: true,
+          phoneNumber: true
+        }
+      }),
+      this.prisma.user.findUnique({
+        where: { id: creditOffer.offerToUserId },
+        select: {
+          id: true,
+          name: true,
+          phoneNumber: true
+        }
+      })
+    ]);
+
+    if (!offerByUser || !offerToUser) {
+      throw new NotFoundException('Related users not found');
+    }
+
     // Check if the user is either the lender or borrower
     const userPhone = user.phoneNumber;
-    if (creditOffer.offerByUser.phoneNumber !== userPhone && 
-        creditOffer.offerToUser.phoneNumber !== userPhone) {
+    if (offerByUser.phoneNumber !== userPhone && 
+        offerToUser.phoneNumber !== userPhone) {
       throw new BadRequestException('You do not have permission to view this credit offer');
     }
 
-    return creditOffer;
+    return {
+      ...creditOffer,
+      offerByUser,
+      offerToUser
+    };
   }
 
   async createCreditRequest(requestCreditDto: RequestCreditDto, user: DecodedIdToken) {
