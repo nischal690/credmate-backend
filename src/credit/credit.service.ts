@@ -2,7 +2,8 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { CreateCreditRequestDto, CreditRequestStatus } from './dto/create-credit-request.dto';
-import { CreditOffer, User, CreditRequest } from '@prisma/client';
+import { CreditOffer, User } from '@prisma/client';
+import { CreditOfferWithUsers } from './types/credit.types';
 
 // Custom type for our Firebase user from the auth guard
 interface FirebaseUser {
@@ -35,10 +36,10 @@ interface RequestCreditDto {
   note?: string;
 }
 
-// Type for credit offer with related user data
-interface CreditOfferWithUsers extends CreditOffer {
-  offerByUser: Pick<User, 'id' | 'name' | 'phoneNumber'>;
-  offerToUser: Pick<User, 'id' | 'name' | 'phoneNumber'>;
+interface CreditStatusUpdateDto {
+  offerId?: string;
+  requestId?: string;
+  status: string;
 }
 
 @Injectable()
@@ -451,5 +452,81 @@ export class CreditService {
     });
 
     return updatedRequest;
+  }
+
+  async updateCreditStatus(
+    creditStatusUpdateDto: CreditStatusUpdateDto,
+    user: DecodedIdToken,
+  ) {
+    const { offerId, requestId, status } = creditStatusUpdateDto;
+
+    if ((!offerId && !requestId) || (offerId && requestId)) {
+      throw new BadRequestException('Please provide either offerId or requestId, but not both');
+    }
+
+    let creditData: any = {
+      creditType: 'PERSONAL',
+      status,
+      recoveryMode: false,
+      requestedToUserId: '',
+      requestByUserId: '',
+    };
+
+    if (offerId) {
+      // Fetch credit offer details
+      const creditOffer = await this.prisma.creditOffer.findUnique({
+        where: { id: offerId },
+      });
+
+      if (!creditOffer) {
+        throw new NotFoundException('Credit offer not found');
+      }
+
+      creditData = {
+        ...creditData,
+        requestId: offerId,
+        loanAmount: creditOffer.loanAmount,
+        loanTerm: creditOffer.loanTerm,
+        timeUnit: creditOffer.timeUnit,
+        interestRate: creditOffer.interestRate,
+        paymentType: creditOffer.paymentType,
+        emiFrequency: creditOffer.emiFrequency || '',
+        offeredId: offerId,
+        offeredByUserId: creditOffer.offerByUserId,
+        offeredToUserId: creditOffer.offerToUserId,
+      };
+    } else {
+      // Fetch credit request details
+      const creditRequest = await this.prisma.creditRequest.findUnique({
+        where: { id: requestId },
+      });
+
+      if (!creditRequest) {
+        throw new NotFoundException('Credit request not found');
+      }
+
+      creditData = {
+        ...creditData,
+        requestId: requestId,
+        loanAmount: creditRequest.loanAmount,
+        loanTerm: creditRequest.loanTerm,
+        timeUnit: creditRequest.timeUnit,
+        interestRate: creditRequest.interestRate,
+        paymentType: creditRequest.paymentType,
+        emiFrequency: creditRequest.emiFrequency || '',
+        requestByUserId: creditRequest.requestByUserId,
+        requestedToUserId: creditRequest.requestedToUserId,
+        offeredId: '',
+        offeredByUserId: '',
+        offeredToUserId: '',
+      };
+    }
+
+    // Create credit entry
+    const creditEntry = await this.prisma.credit.create({
+      data: creditData,
+    });
+
+    return creditEntry;
   }
 }
