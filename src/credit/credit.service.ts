@@ -482,6 +482,15 @@ export class CreditService {
         throw new NotFoundException('Credit offer not found');
       }
 
+      // Update the creditoffer status based on the incoming status
+      const updatedStatus = status === 'ACTIVE' ? 'ACCEPTED' : (status === 'CANCELLED' ? 'REJECTED' : status);
+      await this.prisma.creditOffer.update({
+        where: { id: offerId },
+        data: {
+          status: updatedStatus as any // Using type assertion since we know these are valid CreditOfferStatus values
+        }
+      });
+
       creditData = {
         ...creditData,
         requestId: offerId,
@@ -499,10 +508,33 @@ export class CreditService {
       // Fetch credit request details
       const creditRequest = await this.prisma.creditRequest.findUnique({
         where: { id: requestId },
+        select: {
+          id: true,
+          loanAmount: true,
+          loanTerm: true,
+          timeUnit: true,
+          interestRate: true,
+          paymentType: true,
+          emiFrequency: true,
+          requestByUserId: true,
+          requestedToUserId: true,
+          offerId: true
+        }
       });
 
       if (!creditRequest) {
         throw new NotFoundException('Credit request not found');
+      }
+
+      // If there's an associated offer, update its status too
+      if (creditRequest.offerId) {
+        const updatedStatus = status === 'ACTIVE' ? 'ACCEPTED' : (status === 'CANCELLED' ? 'REJECTED' : status);
+        await this.prisma.creditOffer.update({
+          where: { id: creditRequest.offerId },
+          data: {
+            status: updatedStatus as any // Using type assertion since we know these are valid CreditOfferStatus values
+          }
+        });
       }
 
       creditData = {
