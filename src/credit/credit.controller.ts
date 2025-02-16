@@ -6,8 +6,10 @@ import { GetCreditOffersDto } from './dto/get-credit-offers.dto';
 import { RequestCreditDto } from './dto/request-credit.dto';
 import { CreateCreditRequestDto } from './dto/create-credit-request.dto';
 import { CreditStatusUpdateDto } from './dto/credit-status-update.dto';
+import { UpdatePaymentStatusDto } from './dto/update-payment-status.dto';
 import { Request } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
+import { CreditStatus } from '@prisma/client';
 
 // Extend Express Request to include our user type
 interface RequestWithUser extends Request {
@@ -70,5 +72,35 @@ export class CreditController {
     @Req() request: RequestWithUser,
   ) {
     return this.creditService.updateCreditStatus(creditStatusUpdateDto, request.user);
+  }
+
+  @Post('payment-status')
+  @UseGuards(FirebaseAuthGuard)
+  async updatePaymentStatus(
+    @Body() updatePaymentStatusDto: UpdatePaymentStatusDto,
+    @Req() request: RequestWithUser
+  ) {
+    return this.creditService.updatePaymentStatus(
+      updatePaymentStatusDto.creditId,
+      updatePaymentStatusDto.paymentDate,
+      updatePaymentStatusDto.status,
+      request.user
+    );
+  }
+
+  @Get('transactions')
+  @UseGuards(FirebaseAuthGuard)
+  async getUserCreditTransactions(
+    @Req() request: RequestWithUser,
+    @Query('status') status?: CreditStatus,
+  ) {
+    return this.creditService.getUserCreditTransactions(status, request.user);
+  }
+
+  // Cron job endpoint to update missed payments (should be called daily)
+  @Post('update-missed-payments')
+  @UseGuards(FirebaseAuthGuard)
+  async updateMissedPayments() {
+    return this.creditService.updateMissedPayments();
   }
 }

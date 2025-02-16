@@ -5,6 +5,15 @@ import { CreateCreditRequestDto, CreditRequestStatus } from './dto/create-credit
 import { CreditOffer, User } from '@prisma/client';
 import { CreditOfferWithUsers } from './types/credit.types';
 
+// Payment status types
+enum PaymentStatus {
+  YET_TO_PAY = 'yet_to_pay',
+  PAID = 'paid',
+  BORROWER_MARKED_AS_PAID = 'borrower_marked_as_paid',
+  MISSED = 'missed',
+  PAID_LATE = 'paid_late'
+}
+
 // Custom type for our Firebase user from the auth guard
 interface FirebaseUser {
   uid: string;
@@ -487,7 +496,7 @@ export class CreditService {
       await this.prisma.creditOffer.update({
         where: { id: offerId },
         data: {
-          status: updatedStatus as any // Using type assertion since we know these are valid CreditOfferStatus values
+          status: updatedStatus as any
         }
       });
 
@@ -532,7 +541,7 @@ export class CreditService {
         await this.prisma.creditOffer.update({
           where: { id: creditRequest.offerId },
           data: {
-            status: updatedStatus as any // Using type assertion since we know these are valid CreditOfferStatus values
+            status: updatedStatus as any
           }
         });
       }
@@ -554,11 +563,319 @@ export class CreditService {
       };
     }
 
+    // Calculate due dates and amounts if status is ACTIVE
+    if (status === 'ACTIVE') {
+      const dueDate: { [key: string]: string } = {};
+      const startDate = new Date();
+      
+      if (creditData.paymentType === 'BULLET') {
+        // For bullet payment, calculate single due date based on loan term and time unit
+        const endDate = new Date(startDate);
+        if (creditData.timeUnit === 'DAYS') {
+          endDate.setDate(endDate.getDate() + creditData.loanTerm);
+        } else if (creditData.timeUnit === 'MONTHS') {
+          endDate.setMonth(endDate.getMonth() + creditData.loanTerm);
+        } else if (creditData.timeUnit === 'YEARS') {
+          endDate.setFullYear(endDate.getFullYear() + creditData.loanTerm);
+        }
+        
+        dueDate[endDate.toISOString().split('T')[0]] = PaymentStatus.YET_TO_PAY;
+      } else {
+        // For EMI payments
+        const totalEMIs = creditData.loanTerm;
+        const emiAmount = this.calculateEMIAmount(
+          creditData.loanAmount,
+          creditData.interestRate,
+          totalEMIs
+        );
+        
+        let currentDate = new Date(startDate);
+        for (let i = 0; i < totalEMIs; i++) {
+          if (creditData.emiFrequency === 'WEEKLY') {
+            currentDate.setDate(currentDate.getDate() + 7);
+          } else if (creditData.emiFrequency === 'MONTHLY') {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          } else if (creditData.emiFrequency === 'QUARTERLY') {
+            currentDate.setMonth(currentDate.getMonth() + 3);
+          }
+          
+          const dateKey = currentDate.toISOString().split('T')[0];
+          dueDate[dateKey] = PaymentStatus.YET_TO_PAY;
+        }
+      }
+      
+      creditData.dueDate = dueDate;
+    }
+
     // Create credit entry
     const creditEntry = await this.prisma.credit.create({
       data: creditData,
     });
 
     return creditEntry;
+  }
+
+  async updatePaymentStatus(
+    creditId: string,
+    paymentDate: string,
+    newStatus: PaymentStatus,
+    user: DecodedIdToken
+  ) {
+    // Fetch the credit record
+    const credit = await this.prisma.credit.findUnique({
+      where: { id: creditId }
+    });
+
+    if (!credit) {
+      throw new NotFoundException('Credit record not found');
+    }
+
+    // Get the current due dates map
+    const dueDate = credit.dueDate as { [key: string]: string };
+    
+    if (!dueDate[paymentDate]) {
+      throw new BadRequestException('Invalid payment date');
+    }
+
+    // Validate state transitions based on user role and current status
+    const isLender = credit.offeredByUserId === user.uid || credit.requestedToUserId === user.uid;
+    const isBorrower = credit.offeredToUserId === user.uid || credit.requestByUserId === user.uid;
+    const currentStatus = dueDate[paymentDate];
+
+    this.validateStatusTransition(currentStatus, newStatus, isLender, isBorrower);
+
+    // Update the status for the specific date
+    dueDate[paymentDate] = newStatus;
+
+    // Update the credit record
+    const updatedCredit = await this.prisma.credit.update({
+      where: { id: creditId },
+      data: { dueDate }
+    });
+
+    return updatedCredit;
+  }
+
+  private validateStatusTransition(
+    currentStatus: string,
+    newStatus: PaymentStatus,
+    isLender: boolean,
+    isBorrower: boolean
+  ) {
+    if (!isLender && !isBorrower) {
+      throw new BadRequestException('User is neither lender nor borrower');
+    }
+
+    // Borrower can only mark as "borrower_marked_as_paid"
+    if (isBorrower && !isLender) {
+      if (newStatus !== PaymentStatus.BORROWER_MARKED_AS_PAID) {
+        throw new BadRequestException('Borrower can only mark payment as paid');
+      }
+      if (currentStatus !== PaymentStatus.YET_TO_PAY && currentStatus !== PaymentStatus.MISSED) {
+        throw new BadRequestException('Can only mark payment as paid when status is yet_to_pay or missed');
+      }
+    }
+
+    // Lender can confirm payment or mark as missed/paid_late
+    if (isLender) {
+      if (newStatus === PaymentStatus.BORROWER_MARKED_AS_PAID) {
+        throw new BadRequestException('Only borrower can mark payment as pending confirmation');
+      }
+      if (newStatus === PaymentStatus.PAID && currentStatus !== PaymentStatus.BORROWER_MARKED_AS_PAID) {
+        throw new BadRequestException('Can only confirm payment that is marked as paid by borrower');
+      }
+    }
+  }
+
+  async updateMissedPayments() {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Get all active credits
+    const activeCredits = await this.prisma.credit.findMany({
+      where: { status: 'ACTIVE' }
+    });
+
+    for (const credit of activeCredits) {
+      const dueDate = credit.dueDate as { [key: string]: string };
+      let updated = false;
+
+      // Check each payment date
+      for (const [date, status] of Object.entries(dueDate)) {
+        if (date < today && status === PaymentStatus.YET_TO_PAY) {
+          dueDate[date] = PaymentStatus.MISSED;
+          updated = true;
+        }
+      }
+
+      // Update credit if any changes were made
+      if (updated) {
+        await this.prisma.credit.update({
+          where: { id: credit.id },
+          data: { dueDate }
+        });
+      }
+    }
+  }
+
+  async updateExistingCreditsDueDate() {
+    // Get all credits that don't have dueDate field
+    const credits = await this.prisma.credit.findMany({
+      where: {
+        OR: [
+          { dueDate: null },
+          { dueDate: {} }
+        ]
+      }
+    });
+
+    this.logger.log(`Found ${credits.length} credits to update`);
+
+    for (const credit of credits) {
+      const dueDate: { [key: string]: string } = {};
+      const startDate = credit.createdAt;
+      
+      if (credit.paymentType === 'BULLET') {
+        // For bullet payment, calculate single due date based on loan term and time unit
+        const endDate = new Date(startDate);
+        if (credit.timeUnit === 'DAYS') {
+          endDate.setDate(endDate.getDate() + credit.loanTerm);
+        } else if (credit.timeUnit === 'MONTHS') {
+          endDate.setMonth(endDate.getMonth() + credit.loanTerm);
+        } else if (credit.timeUnit === 'YEARS') {
+          endDate.setFullYear(endDate.getFullYear() + credit.loanTerm);
+        }
+        
+        dueDate[endDate.toISOString().split('T')[0]] = PaymentStatus.YET_TO_PAY;
+      } else {
+        // For EMI payments
+        const totalEMIs = credit.loanTerm;
+        const emiAmount = this.calculateEMIAmount(
+          credit.loanAmount,
+          credit.interestRate,
+          totalEMIs
+        );
+        
+        let currentDate = new Date(startDate);
+        for (let i = 0; i < totalEMIs; i++) {
+          if (credit.emiFrequency === 'WEEKLY') {
+            currentDate.setDate(currentDate.getDate() + 7);
+          } else if (credit.emiFrequency === 'MONTHLY') {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          } else if (credit.emiFrequency === 'QUARTERLY') {
+            currentDate.setMonth(currentDate.getMonth() + 3);
+          }
+          
+          // Check if the date has passed and set appropriate status
+          const today = new Date();
+          const paymentDate = currentDate.toISOString().split('T')[0];
+          
+          if (currentDate < today) {
+            dueDate[paymentDate] = PaymentStatus.MISSED;
+          } else {
+            dueDate[paymentDate] = PaymentStatus.YET_TO_PAY;
+          }
+        }
+      }
+
+      // Update the credit record with calculated due dates
+      await this.prisma.credit.update({
+        where: { id: credit.id },
+        data: { dueDate }
+      });
+
+      this.logger.log(`Updated credit ${credit.id} with due dates`);
+    }
+
+    return { message: `Updated ${credits.length} credit records with due dates` };
+  }
+
+  async getUserCreditTransactions(status: string | undefined, user: FirebaseUser) {
+    if (!user.phoneNumber) {
+      throw new BadRequestException('User must have a verified phone number');
+    }
+
+    // Get user ID from phone number
+    const userRecord = await this.prisma.user.findUnique({
+      where: {
+        phoneNumber: user.phoneNumber,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!userRecord) {
+      throw new NotFoundException('User not found');
+    }
+
+    const where: any = {
+      offeredToUserId: userRecord.id,
+    };
+
+    if (status) {
+      where.status = status;
+    }
+
+    const credits = await this.prisma.credit.findMany({
+      where,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        creditType: true,
+        loanAmount: true,
+        loanTerm: true,
+        timeUnit: true,
+        interestRate: true,
+        paymentType: true,
+        emiFrequency: true,
+        status: true,
+        recoveryMode: true,
+        createdAt: true,
+        finalizedAt: true,
+        dueDate: true,
+        requestByUserId: true,
+        requestedToUserId: true,
+        offeredByUserId: true,
+        offeredToUserId: true,
+      },
+    });
+
+    // Get the user details for each offeredByUserId
+    const offeredByUserIds = [...new Set(credits.map(credit => credit.offeredByUserId))];
+    const offeredByUsers = await this.prisma.user.findMany({
+      where: {
+        phoneNumber: {
+          in: offeredByUserIds
+        }
+      },
+      select: {
+        phoneNumber: true,
+        name: true,
+        email: true,
+      }
+    });
+
+    // Create a map of offeredByUserId to user details
+    const userDetailsMap = new Map(
+      offeredByUsers.map(user => [user.phoneNumber, user])
+    );
+
+    // Combine credit data with user details
+    const creditsWithUserDetails = credits.map(credit => ({
+      ...credit,
+      offeredByUser: userDetailsMap.get(credit.offeredByUserId) || null
+    }));
+
+    return creditsWithUserDetails;
+  }
+
+  // Helper function to calculate EMI amount with interest
+  private calculateEMIAmount(principal: number, interestRate: number, tenure: number): number {
+    const monthlyRate = interestRate / (12 * 100); // Convert annual rate to monthly
+    const emi = (principal * monthlyRate * Math.pow(1 + monthlyRate, tenure)) / 
+                (Math.pow(1 + monthlyRate, tenure) - 1);
+    return Math.round(emi * 100) / 100; // Round to 2 decimal places
   }
 }
