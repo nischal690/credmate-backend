@@ -78,13 +78,12 @@ export class CreditController {
   @UseGuards(FirebaseAuthGuard)
   async updatePaymentStatus(
     @Body() updatePaymentStatusDto: UpdatePaymentStatusDto,
-    @Req() request: RequestWithUser
+    @Req() request: RequestWithUser,
   ) {
     return this.creditService.updatePaymentStatus(
       updatePaymentStatusDto.creditId,
       updatePaymentStatusDto.paymentDate,
       updatePaymentStatusDto.status,
-      request.user
     );
   }
 

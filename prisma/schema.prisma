@@ -173,6 +173,7 @@ model Credit {
   offeredByUserId   String
   offeredToUserId   String
   metadata          Json?
+  dueDate           Json?        // Stores due date status for bullet payment or EMI dates with their statuses
 
   @@index([requestId])
   @@index([requestByUserId])
