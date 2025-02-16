@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { CreateCreditRequestDto, CreditRequestStatus } from './dto/create-credit-request.dto';
-import { CreditOffer, User } from '@prisma/client';
+import { CreditOffer, User, Credit, CreditType, CreditStatus } from '@prisma/client';
 import { CreditOfferWithUsers } from './types/credit.types';
 
 // Payment status types
@@ -13,6 +13,8 @@ enum PaymentStatus {
   MISSED = 'missed',
   PAID_LATE = 'paid_late'
 }
+
+type DueDateRecord = Record<string, PaymentStatus>;
 
 // Custom type for our Firebase user from the auth guard
 interface FirebaseUser {
@@ -473,12 +475,23 @@ export class CreditService {
       throw new BadRequestException('Please provide either offerId or requestId, but not both');
     }
 
-    let creditData: any = {
-      creditType: 'PERSONAL',
-      status,
+    let creditData: Omit<Credit, 'id' | 'createdAt' | 'finalizedAt' | 'metadata'> = {
+      creditType: CreditType.PERSONAL,
+      status: status as CreditStatus,
       recoveryMode: false,
+      requestId: '',
       requestedToUserId: '',
       requestByUserId: '',
+      loanAmount: 0,
+      loanTerm: 0,
+      timeUnit: '',
+      interestRate: 0,
+      paymentType: '',
+      emiFrequency: '',
+      offeredId: null,
+      offeredByUserId: '',
+      offeredToUserId: '',
+      dueDate: null
     };
 
     if (offerId) {
@@ -565,7 +578,7 @@ export class CreditService {
 
     // Calculate due dates and amounts if status is ACTIVE
     if (status === 'ACTIVE') {
-      const dueDate: { [key: string]: string } = {};
+      const dueDate: DueDateRecord = {};
       const startDate = new Date();
       
       if (creditData.paymentType === 'BULLET') {
@@ -619,106 +632,74 @@ export class CreditService {
     creditId: string,
     paymentDate: string,
     newStatus: PaymentStatus,
-    user: DecodedIdToken
   ) {
-    // Fetch the credit record
     const credit = await this.prisma.credit.findUnique({
-      where: { id: creditId }
+      where: { id: creditId },
     });
 
     if (!credit) {
-      throw new NotFoundException('Credit record not found');
+      throw new NotFoundException('Credit not found');
     }
 
     // Get the current due dates map
-    const dueDate = credit.dueDate as { [key: string]: string };
+    const dueDate = (credit.dueDate as DueDateRecord) || {};
     
     if (!dueDate[paymentDate]) {
       throw new BadRequestException('Invalid payment date');
     }
 
-    // Validate state transitions based on user role and current status
-    const isLender = credit.offeredByUserId === user.uid || credit.requestedToUserId === user.uid;
-    const isBorrower = credit.offeredToUserId === user.uid || credit.requestByUserId === user.uid;
-    const currentStatus = dueDate[paymentDate];
-
-    this.validateStatusTransition(currentStatus, newStatus, isLender, isBorrower);
-
-    // Update the status for the specific date
+    // Update the status for this payment date
     dueDate[paymentDate] = newStatus;
 
     // Update the credit record
     const updatedCredit = await this.prisma.credit.update({
       where: { id: creditId },
-      data: { dueDate }
+      data: {
+        dueDate
+      }
     });
 
     return updatedCredit;
   }
 
-  private validateStatusTransition(
-    currentStatus: string,
-    newStatus: PaymentStatus,
-    isLender: boolean,
-    isBorrower: boolean
-  ) {
-    if (!isLender && !isBorrower) {
-      throw new BadRequestException('User is neither lender nor borrower');
-    }
-
-    // Borrower can only mark as "borrower_marked_as_paid"
-    if (isBorrower && !isLender) {
-      if (newStatus !== PaymentStatus.BORROWER_MARKED_AS_PAID) {
-        throw new BadRequestException('Borrower can only mark payment as paid');
-      }
-      if (currentStatus !== PaymentStatus.YET_TO_PAY && currentStatus !== PaymentStatus.MISSED) {
-        throw new BadRequestException('Can only mark payment as paid when status is yet_to_pay or missed');
-      }
-    }
-
-    // Lender can confirm payment or mark as missed/paid_late
-    if (isLender) {
-      if (newStatus === PaymentStatus.BORROWER_MARKED_AS_PAID) {
-        throw new BadRequestException('Only borrower can mark payment as pending confirmation');
-      }
-      if (newStatus === PaymentStatus.PAID && currentStatus !== PaymentStatus.BORROWER_MARKED_AS_PAID) {
-        throw new BadRequestException('Can only confirm payment that is marked as paid by borrower');
-      }
-    }
-  }
-
   async updateMissedPayments() {
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Get all active credits
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const activeCredits = await this.prisma.credit.findMany({
-      where: { status: 'ACTIVE' }
+      where: {
+        status: 'ACTIVE',
+        dueDate: {
+          not: null
+        }
+      }
     });
 
     for (const credit of activeCredits) {
-      const dueDate = credit.dueDate as { [key: string]: string };
+      const dueDate = (credit.dueDate as DueDateRecord) || {};
       let updated = false;
 
       // Check each payment date
-      for (const [date, status] of Object.entries(dueDate)) {
-        if (date < today && status === PaymentStatus.YET_TO_PAY) {
+      Object.entries(dueDate).forEach(([date, status]) => {
+        if (status === PaymentStatus.YET_TO_PAY && new Date(date) < today) {
           dueDate[date] = PaymentStatus.MISSED;
           updated = true;
         }
-      }
+      });
 
-      // Update credit if any changes were made
       if (updated) {
         await this.prisma.credit.update({
           where: { id: credit.id },
-          data: { dueDate }
+          data: {
+            dueDate
+          }
         });
       }
     }
   }
 
   async updateExistingCreditsDueDate() {
-    // Get all credits that don't have dueDate field
+    // Find credits without due dates
     const credits = await this.prisma.credit.findMany({
       where: {
         OR: [
@@ -728,59 +709,41 @@ export class CreditService {
       }
     });
 
-    this.logger.log(`Found ${credits.length} credits to update`);
+    this.logger.log(`Found ${credits.length} credits without due dates`);
 
     for (const credit of credits) {
-      const dueDate: { [key: string]: string } = {};
-      const startDate = credit.createdAt;
-      
+      let dueDate: DueDateRecord = {};
+
       if (credit.paymentType === 'BULLET') {
-        // For bullet payment, calculate single due date based on loan term and time unit
-        const endDate = new Date(startDate);
+        // For bullet payment, calculate the due date based on loan term
+        const dueDateTime = new Date(credit.createdAt);
         if (credit.timeUnit === 'DAYS') {
-          endDate.setDate(endDate.getDate() + credit.loanTerm);
+          dueDateTime.setDate(dueDateTime.getDate() + credit.loanTerm);
         } else if (credit.timeUnit === 'MONTHS') {
-          endDate.setMonth(endDate.getMonth() + credit.loanTerm);
-        } else if (credit.timeUnit === 'YEARS') {
-          endDate.setFullYear(endDate.getFullYear() + credit.loanTerm);
+          dueDateTime.setMonth(dueDateTime.getMonth() + credit.loanTerm);
         }
-        
-        dueDate[endDate.toISOString().split('T')[0]] = PaymentStatus.YET_TO_PAY;
-      } else {
-        // For EMI payments
-        const totalEMIs = credit.loanTerm;
-        const emiAmount = this.calculateEMIAmount(
-          credit.loanAmount,
-          credit.interestRate,
-          totalEMIs
-        );
-        
+        dueDate[dueDateTime.toISOString().split('T')[0]] = PaymentStatus.YET_TO_PAY;
+      } else if (credit.paymentType === 'EMI') {
+        // For EMI, calculate multiple due dates based on frequency
+        const startDate = new Date(credit.createdAt);
         let currentDate = new Date(startDate);
-        for (let i = 0; i < totalEMIs; i++) {
-          if (credit.emiFrequency === 'WEEKLY') {
-            currentDate.setDate(currentDate.getDate() + 7);
-          } else if (credit.emiFrequency === 'MONTHLY') {
+
+        for (let i = 0; i < credit.loanTerm; i++) {
+          if (credit.emiFrequency === 'MONTHLY') {
             currentDate.setMonth(currentDate.getMonth() + 1);
-          } else if (credit.emiFrequency === 'QUARTERLY') {
-            currentDate.setMonth(currentDate.getMonth() + 3);
+          } else if (credit.emiFrequency === 'WEEKLY') {
+            currentDate.setDate(currentDate.getDate() + 7);
           }
-          
-          // Check if the date has passed and set appropriate status
-          const today = new Date();
-          const paymentDate = currentDate.toISOString().split('T')[0];
-          
-          if (currentDate < today) {
-            dueDate[paymentDate] = PaymentStatus.MISSED;
-          } else {
-            dueDate[paymentDate] = PaymentStatus.YET_TO_PAY;
-          }
+          dueDate[currentDate.toISOString().split('T')[0]] = PaymentStatus.YET_TO_PAY;
         }
       }
 
       // Update the credit record with calculated due dates
       await this.prisma.credit.update({
         where: { id: credit.id },
-        data: { dueDate }
+        data: {
+          dueDate
+        }
       });
 
       this.logger.log(`Updated credit ${credit.id} with due dates`);
