@@ -94,7 +94,7 @@ export class UserService extends BaseService {
       date_of_birth?: any;
       name?: any;
       plan?: any;
-      planExpiry?: Date;
+      planPrice?: any;
     } = {
       ...(updateData.name && { name: updateData.name }),
       ...(updateData.date_of_birth && { date_of_birth: updateData.date_of_birth }),
@@ -110,8 +110,8 @@ export class UserService extends BaseService {
     if (updateData.plan) {
       dataToUpdate.plan = updateData.plan;
     }
-    if (updateData.planExpiry) {
-      dataToUpdate.planExpiry = new Date(updateData.planExpiry);
+    if (updateData.planPrice !== undefined) {
+      dataToUpdate.planPrice = updateData.planPrice;
     }
 
     // Update user profile in database only if we have data to update

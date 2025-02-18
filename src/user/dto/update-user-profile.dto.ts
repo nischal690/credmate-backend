@@ -1,10 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsDateString, IsBoolean, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsBoolean, IsEnum, IsNumber } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Express } from 'express';
 
 enum UserPlan {
-  // Add your plan enum values here
+  FREE = 'FREE',
+  PRO_INDIVIDUAL = 'PRO_INDIVIDUAL',
+  PRO_BUSINESS = 'PRO_BUSINESS',
+  PRIORITY_BUSINESS = 'PRIORITY_BUSINESS'
 }
 
 export class UpdateUserProfileDto {
@@ -89,7 +92,7 @@ export class UpdateUserProfileDto {
   @ApiProperty({
     description: 'User subscription plan',
     enum: UserPlan,
-    example: 'PRO_INDIVIDUAL',
+    example: 'PRO_BUSINESS',
     required: false,
   })
   @IsOptional()
@@ -97,11 +100,12 @@ export class UpdateUserProfileDto {
   plan?: UserPlan;
 
   @ApiProperty({
-    description: 'Plan expiry date',
-    example: '2025-12-31',
+    description: 'Price of the plan',
+    example: 199,
     required: false,
   })
   @IsOptional()
-  @IsDateString()
-  planExpiry?: string;
+  @IsNumber()
+  @Transform(({ value }) => value ? Number(value) : undefined)
+  planPrice?: number;
 }
