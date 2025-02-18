@@ -14,7 +14,15 @@ enum PaymentStatus {
   PAID_LATE = 'paid_late'
 }
 
-type DueDateRecord = Record<string, PaymentStatus>;
+// Type for due date record structure
+interface DueDateRecord {
+  [key: string]: PaymentStatus;
+}
+
+// Type for Credit with proper dueDate typing
+interface CreditWithDueDate extends Omit<Credit, 'dueDate'> {
+  dueDate: DueDateRecord | null;
+}
 
 // Custom type for our Firebase user from the auth guard
 interface FirebaseUser {
@@ -635,14 +643,36 @@ export class CreditService {
   ) {
     const credit = await this.prisma.credit.findUnique({
       where: { id: creditId },
-    });
+      select: {
+        id: true,
+        creditType: true,
+        requestId: true,
+        requestByUserId: true,
+        requestedToUserId: true,
+        loanAmount: true,
+        loanTerm: true,
+        timeUnit: true,
+        interestRate: true,
+        paymentType: true,
+        emiFrequency: true,
+        status: true,
+        offeredId: true,
+        recoveryMode: true,
+        createdAt: true,
+        finalizedAt: true,
+        offeredByUserId: true,
+        offeredToUserId: true,
+        metadata: true,
+        dueDate: true
+      }
+    }) as CreditWithDueDate;
 
     if (!credit) {
       throw new NotFoundException('Credit not found');
     }
 
     // Get the current due dates map
-    const dueDate = (credit.dueDate as DueDateRecord) || {};
+    const dueDate = credit.dueDate || {};
     
     if (!dueDate[paymentDate]) {
       throw new BadRequestException('Invalid payment date');
@@ -673,10 +703,10 @@ export class CreditService {
           not: null
         }
       }
-    });
+    }) as CreditWithDueDate[];
 
     for (const credit of activeCredits) {
-      const dueDate = (credit.dueDate as DueDateRecord) || {};
+      const dueDate = credit.dueDate || {};
       let updated = false;
 
       // Check each payment date
